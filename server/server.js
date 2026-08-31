@@ -27,6 +27,9 @@ const publicDir = path.join(rootDir, "public");
 
 const app = express();
 
+// Trust Cloudflare proxy (vì tunnel forward X-Forwarded-For)
+app.set("trust proxy", true);
+
 // ─── CORS Whitelist ─────────────────────────────────────────────────────────
 // Chỉ cho phép origins trong config.corsOrigins, hỗ trợ wildcard *.officeapps.live.com
 const corsOriginPatterns = config.corsOrigins.map((o) => {
@@ -57,6 +60,12 @@ app.use(express.json({ limit: "20mb" }));
 // Serve static assets và giao diện Taskpane
 app.use(express.static(publicDir));
 app.use("/assets", express.static(path.join(rootDir, "assets")));
+
+// Serve manifest.xml ở root URL (Office cần fetch tại /manifest.xml)
+app.get("/manifest.xml", (req, res) => {
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.sendFile(path.join(rootDir, "manifest.xml"));
+});
 
 // ─── API Routes ─────────────────────────────────────────────────────────────
 
