@@ -1441,12 +1441,12 @@ class AppController {
     this.dom.chatContainer.scrollTop = this.dom.chatContainer.scrollHeight;
   }
 
-  showToast(msg) {
+  showToast(msg, type = "info") {
     const existing = document.querySelector(".toast-msg");
     if (existing) existing.remove();
 
     const toast = document.createElement("div");
-    toast.className = "toast-msg";
+    toast.className = `toast-msg ${type}`;
     toast.textContent = msg;
 
     document.body.appendChild(toast);
