@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trợ lý AI Word</title>
+  <!-- Office.js SDK -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <!-- Main Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- ─── HEADER ─── -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">✨</div>
+        <span class="brand-name">Trợ lý AI Word</span>
+      </div>
+      <div class="header-actions">
+        <div id="statusPill" class="status-pill offline" title="Trạng thái kết nối Word Bridge">
+          <span class="status-dot"></span>
+          <span id="statusText">Đang nối...</span>
+        </div>
+        <button id="btnToggleTheme" class="icon-btn" title="Chuyển đổi Chế độ Sáng / Tối">🌙</button>
+        <button id="btnSettings" class="icon-btn" title="Cài đặt mô hình & Giọng văn">⚙️</button>
+      </div>
+    </header>
+
+    <!-- ─── SKILLS BAR (HORIZONTAL CHIPS) ─── -->
+    <div id="skillsBar" class="skills-bar" title="Nhấp để áp dụng kỹ năng nhanh">
+      <!-- Skills dynamically injected here -->
+    </div>
+
+    <!-- ─── ACTIVE CONTEXT BAR ─── -->
+    <div id="contextBar" class="context-bar" style="display: none;">
+      <div class="context-chip">
+        <span id="contextTypeIcon">🎯</span>
+        <span id="contextLabel">Đoạn chọn: 0 từ</span>
+      </div>
+      <button id="btnClearContext" class="context-btn-clear" title="Bỏ đính kèm ngữ cảnh">✕</button>
+    </div>
+
+    <!-- ─── AGENT ACTIVE BANNER (WHEN MCP AGENT RUNS OPS) ─── -->
+    <div id="agentBanner" class="agent-banner">
+      <span>🤖</span>
+      <span id="agentBannerText">AI Agent đang thao tác tài liệu Word...</span>
+    </div>
+
+    <!-- ─── CHAT CONVERSATION AREA ─── -->
+    <main id="chatContainer" class="chat-container">
+      <div id="emptyHint" class="empty-state">
+        <div class="welcome-hero">
+          <div class="welcome-badge">✍️</div>
+          <h2 class="welcome-title">Chào bạn! Tôi có thể giúp gì cho bài viết?</h2>
+          <p class="welcome-desc">Chọn nhanh một tác vụ bên dưới hoặc bôi đen văn bản trong Word để bắt đầu.</p>
+        </div>
+
+        <div class="starter-grid">
+          <div class="starter-card" data-skill="polish">
+            <span class="starter-icon">✍️</span>
+            <span class="starter-title">Viết lại mượt mà</span>
+            <span class="starter-subtitle">Diễn đạt trôi chảy, tự nhiên</span>
+          </div>
+          <div class="starter-card" data-skill="grammar">
+            <span class="starter-icon">🔍</span>
+            <span class="starter-title">Sửa chính tả</span>
+            <span class="starter-subtitle">Soát dấu câu & ngữ pháp</span>
+          </div>
+          <div class="starter-card" data-skill="formal">
+            <span class="starter-icon">👔</span>
+            <span class="starter-title">Trang trọng hóa</span>
+            <span class="starter-subtitle">Văn phong chuẩn hành chính</span>
+          </div>
+          <div class="starter-card" data-skill="comment_review">
+            <span class="starter-icon">💬</span>
+            <span class="starter-title">Góp ý lề trang</span>
+            <span class="starter-subtitle">Để lại nhận xét bên phải</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ─── COMPOSER FOOTER ─── -->
+    <footer class="composer-footer">
+      <div class="composer-toolbar">
+        <div class="toolbar-left">
+          <button id="btnReadSelection" class="tool-chip-btn" title="Đọc đoạn đang bôi đen">
+            <span>🎯</span> Bôi đen
+          </button>
+          <button id="btnReadDoc" class="tool-chip-btn" title="Đọc toàn bộ tài liệu">
+            <span>📑</span> Toàn bài
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <button id="btnClearChat" class="tool-chip-btn" title="Xóa lịch sử chat của file này">
+            <span>🗑️</span> Xóa chat
+          </button>
+        </div>
+      </div>
+
+      <div class="input-box-wrapper">
+        <textarea
+          id="chatInput"
+          class="chat-input"
+          placeholder="Nhập yêu cầu hoặc câu hỏi về bài viết..."
+          rows="1"
+        ></textarea>
+        <button id="btnSend" class="send-btn" title="Gửi yêu cầu">
+          <span>➤</span>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ─── SETTINGS MODAL ─── -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title"><span>⚙️</span> Cài đặt Trợ lý AI</h3>
+        <button id="btnCloseSettings" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label class="form-label">AI Endpoint (Gateway URL)</label>
+          <input
+            id="cfgEndpoint"
+            type="text"
+            class="form-input"
+            placeholder="https://api.deepseek.com/chat/completions"
+          />
+          <span class="form-help">Hỗ trợ DeepSeek, OpenAI, Claude, Gemini hoặc Gateway nội bộ.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <input
+            id="cfgApiKey"
+            type="password"
+            class="form-input"
+            placeholder="sk-..."
+          />
+          <span class="form-help">Khóa API được lưu an toàn cục bộ trong máy tính của bạn.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tên Mô Hình (Model)</label>
+          <input
+            id="cfgModel"
+            type="text"
+            class="form-input"
+            placeholder="deepseek-chat (hoặc claude-3-5-sonnet, gpt-4o)"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🧠 Giọng văn cá nhân mẫu (House Voice)</label>
+          <textarea
+            id="cfgHouseVoice"
+            class="form-textarea"
+            rows="3"
+            placeholder="Dán 1-3 đoạn văn bản mẫu phong cách chuẩn của bạn vào đây để AI học văn phong..."
+          ></textarea>
+          <span class="form-help">AI sẽ tự động mô phỏng nhịp điệu và câu từ của đoạn mẫu này trong mọi câu trả lời.</span>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="btnTestConn" class="btn secondary">Kiểm tra kết nối</button>
+        <button id="btnSaveSettings" class="btn primary">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript App Module -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

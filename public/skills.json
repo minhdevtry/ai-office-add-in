@@ -1,0 +1,74 @@
+[
+  {
+    "id": "polish",
+    "icon": "✍️",
+    "label": "Viết lại mượt",
+    "tip": "Chỉnh sửa câu văn trôi chảy, tự nhiên và lôi cuốn hơn",
+    "prompt": "Hãy viết lại đoạn văn sau cho trôi chảy, tự nhiên, văn phong mạch lạc và lôi cuốn hơn nhưng giữ nguyên nội dung cốt lõi.",
+    "context": "selection",
+    "defaultMode": "replace"
+  },
+  {
+    "id": "grammar",
+    "icon": "🔍",
+    "label": "Sửa chính tả",
+    "tip": "Tìm và sửa lỗi ngữ pháp, chính tả tiếng Việt",
+    "prompt": "Hãy tìm và sửa tất cả các lỗi chính tả, lỗi gõ dấu tiếng Việt và ngữ pháp trong đoạn văn sau. Liệt kê rõ những từ đã sửa và đưa ra bản văn đã sửa hoàn chỉnh.",
+    "context": "selection",
+    "defaultMode": "replace"
+  },
+  {
+    "id": "formal",
+    "icon": "👔",
+    "label": "Trang trọng hóa",
+    "tip": "Chuyển sang văn phong hành chính, công vụ",
+    "prompt": "Hãy chuyển đổi đoạn văn sau sang văn phong hành chính, trang trọng, chuẩn mực công vụ.",
+    "context": "selection",
+    "defaultMode": "replace"
+  },
+  {
+    "id": "cut_fluff",
+    "icon": "✂️",
+    "label": "Gọt từ thừa",
+    "tip": "Rút ngắn 20-30% câu từ, bỏ từ sáo rỗng",
+    "prompt": "Hãy cô đọng đoạn văn sau, loại bỏ các từ ngữ dư thừa, sáo rỗng, giảm 20-30% độ dài nhưng giữ nguyên toàn bộ ý chính.",
+    "context": "selection",
+    "defaultMode": "replace"
+  },
+  {
+    "id": "summary",
+    "icon": "📝",
+    "label": "Tóm tắt ý",
+    "tip": "Trích xuất các luận điểm cốt lõi gạch đầu dòng",
+    "prompt": "Hãy tóm tắt các luận điểm cốt lõi của văn bản sau dưới dạng các gạch đầu dòng rõ ràng, súc tích.",
+    "context": "auto",
+    "defaultMode": "after"
+  },
+  {
+    "id": "translate_en",
+    "icon": "🌐",
+    "label": "Dịch Việt ➔ Anh",
+    "tip": "Dịch chuẩn xác sang tiếng Anh tự nhiên",
+    "prompt": "Hãy dịch chuẩn xác đoạn văn bản sau sang tiếng Anh tự nhiên, học thuật và chuyên nghiệp.",
+    "context": "selection",
+    "defaultMode": "after"
+  },
+  {
+    "id": "comment_review",
+    "icon": "💬",
+    "label": "Nhận xét lề trang",
+    "tip": "Đưa ra đánh giá, nhận xét bên lề tài liệu",
+    "prompt": "Đóng vai trò là một biên tập viên chuyên nghiệp, hãy đưa ra nhận xét, đánh giá ưu/nhược điểm và gợi ý cải thiện cho đoạn văn bản sau.",
+    "context": "selection",
+    "defaultMode": "comment"
+  },
+  {
+    "id": "ai_proof",
+    "icon": "🕵️",
+    "label": "Sửa văn phong AI",
+    "tip": "Loại bỏ văn mẫu sáo rỗng thường thấy của AI",
+    "prompt": "Hãy viết lại đoạn văn sau để câu từ nghe chân thực, tự nhiên như con người viết, loại bỏ các cấu trúc sáo rỗng hay lặp lại của AI.",
+    "context": "selection",
+    "defaultMode": "replace"
+  }
+]
