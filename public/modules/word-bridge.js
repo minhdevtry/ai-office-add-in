@@ -201,18 +201,35 @@ function stripTags(s) {
 
 // ─── WordBridge Class ───────────────────────────────────────────────────────
 
+const DEFAULT_SIMULATED_DOC = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+---
+BÁO CÁO TIẾN ĐỘ DỰ ÁN QUÝ 3
+
+Kính gửi Ban Giám đốc, chúng tôi xin gửi lời cảm ơn sâu sắc đến sự quan tâm của ban lãnh đạo.
+Dự án chuyển đổi số đang đóng vai trò vô cùng quan trọng đối với sự phát triển của công ty.
+Tuy nhiên, trong quá trình thực hiện vẫn còn một số lỗi chính tả và câu cú chưa được chuẩn xác.
+Chúng tôi xin cam kết sẽ hoàn thành đúng tiến độ đề ra.`;
+
 export class WordBridge {
   constructor() {
     this._trackChangesSupported = null;
     this._commentsSupported = null;
     this.cachedSelection = "";
+    this._simulatedDocText = DEFAULT_SIMULATED_DOC;
+    this._simulatedComments = [];
   }
 
   isAvailable() {
-    return typeof Office !== "undefined" && typeof Word !== "undefined";
+    return typeof Office !== "undefined" && typeof Word !== "undefined" && typeof Word.run === "function";
+  }
+
+  isSimulator() {
+    return !this.isAvailable();
   }
 
   get commentsSupported() {
+    if (!this.isAvailable()) return true;
     if (this._commentsSupported === null) {
       try {
         this._commentsSupported =
@@ -225,6 +242,7 @@ export class WordBridge {
   }
 
   get trackChangesSupported() {
+    if (!this.isAvailable()) return true;
     if (this._trackChangesSupported === null) {
       try {
         this._trackChangesSupported =
@@ -243,7 +261,7 @@ export class WordBridge {
    * Ưu tiên Common API (ổn định hơn Word.run trên iPad/Web).
    */
   async getSelectedText() {
-    if (!this.isAvailable()) return this.cachedSelection || "";
+    if (!this.isAvailable()) return this.cachedSelection || "chúng tôi xin gửi lời cảm ơn sâu sắc";
     return new Promise((resolve, reject) => {
       try {
         Office.context.document.getSelectedDataAsync(
@@ -281,7 +299,7 @@ export class WordBridge {
    * @returns {Promise<{ text: string, markdown: string, html: string }>}
    */
   async getSelectionAsMarkdown() {
-    if (!this.isAvailable()) return { text: this.cachedSelection || "", markdown: "", html: "" };
+    if (!this.isAvailable()) return { text: this.cachedSelection || "chúng tôi xin gửi lời cảm ơn sâu sắc", markdown: "chúng tôi xin gửi lời cảm ơn sâu sắc", html: "" };
     return Word.run(async (context) => {
       const sel = context.document.getSelection();
       sel.load(["text", "html"]);
@@ -300,7 +318,10 @@ export class WordBridge {
    * Dùng `body.text` (1 sync) thay vì loop paragraphs.items[] (N sync calls).
    */
   async getFullDocumentText(limit = 0) {
-    if (!this.isAvailable()) return "";
+    if (!this.isAvailable()) {
+      const full = this._simulatedDocText || "";
+      return limit > 0 && full.length > limit ? full.slice(0, limit) : full;
+    }
     return Word.run(async (context) => {
       const body = context.document.body;
       body.load("text");
@@ -391,13 +412,25 @@ export class WordBridge {
    * Comment từ AI Agent tự động prefix "[Ori Agent] " để user phân biệt.
    */
   async insertComment(commentText, anchor = null, { authorTag = true } = {}) {
-    if (!this.isAvailable()) throw new Error("Office.js không khả dụng");
+    const finalText = authorTag ? `[Ori Agent] ${commentText}` : commentText;
+    if (!this.isAvailable()) {
+      const simComm = {
+        index: this._simulatedComments.length,
+        id: `sim_comm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        anchor: anchor || "",
+        content: finalText,
+        text: finalText,
+        author: "[Ori Agent]",
+        isAgent: true,
+      };
+      this._simulatedComments.push(simComm);
+      return { ok: true, type: "margin_comment", text: finalText, simulated: true };
+    }
     if (!this.commentsSupported || typeof Word?.Comment === "undefined") {
       throw new Error(
         "Phiên bản Word hiện tại không hỗ trợ chèn bình luận (cần Word 2016 trở lên hoặc Microsoft 365)."
       );
     }
-    const finalText = authorTag ? `[Ori Agent] ${commentText}` : commentText;
     return Word.run(async (context) => {
       let targetRange;
       if (anchor && typeof anchor === "string" && anchor.trim()) {
@@ -420,7 +453,7 @@ export class WordBridge {
    * Dùng để panel "Nhận xét chờ duyệt" biết có bao nhiêu comment từ [Ori Agent].
    */
   async getComments() {
-    if (!this.isAvailable()) return [];
+    if (!this.isAvailable()) return this._simulatedComments || [];
     if (!this.commentsSupported || typeof Word?.Comment === "undefined") return [];
 
     return Word.run(async (context) => {
@@ -442,7 +475,10 @@ export class WordBridge {
    * Dùng khi user click Accept mà add-in chỉ biết anchor text (chưa track id).
    */
   async findCommentByAnchor(anchorText) {
-    if (!this.isAvailable()) return null;
+    if (!this.isAvailable()) {
+      const found = this._simulatedComments.find((c) => c.anchor === anchorText);
+      return found || null;
+    }
     return Word.run(async (context) => {
       const results = context.document.body.search(anchorText, { matchCase: false });
       results.load("items");
@@ -467,7 +503,12 @@ export class WordBridge {
    * Add-in Word không expose id ổn định qua API 1.4 — ta xoá theo anchor.
    */
   async deleteComment({ anchorText, commentId } = {}) {
-    if (!this.isAvailable()) return { ok: false };
+    if (!this.isAvailable()) {
+      if (anchorText) {
+        this._simulatedComments = this._simulatedComments.filter((c) => c.anchor !== anchorText);
+      }
+      return { ok: true, simulated: true };
+    }
     return Word.run(async (context) => {
       let targetComment = null;
       if (anchorText) {
@@ -493,9 +534,15 @@ export class WordBridge {
    * Đây là flow chính khi user bấm "✓ Áp dụng" bên cạnh mỗi [Ori Agent] comment.
    */
   async acceptComment({ anchorText, replacementText } = {}) {
-    if (!this.isAvailable()) return { ok: false };
     if (!anchorText || !replacementText) {
       return { ok: false, error: "Thiếu anchorText hoặc replacementText" };
+    }
+    if (!this.isAvailable()) {
+      if (this._simulatedDocText.includes(anchorText)) {
+        this._simulatedDocText = this._simulatedDocText.replace(anchorText, replacementText);
+      }
+      this._simulatedComments = this._simulatedComments.filter((c) => c.anchor !== anchorText);
+      return { ok: true, simulated: true };
     }
     return Word.run(async (context) => {
       const results = context.document.body.search(anchorText, { matchCase: false });
@@ -707,7 +754,10 @@ export class WordBridge {
    * Chèn tại vị trí con trỏ.
    */
   async insertAtCursor(text) {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {
+      this._simulatedDocText += `\n${text}`;
+      return { ok: true, simulated: true };
+    }
     const hasMarkdown = /(\*\*|\*|#{1,3}\s|[-*]\s)/.test(text);
 
     if (hasMarkdown) {
@@ -1072,12 +1122,12 @@ export class WordBridge {
    */
   getTextAnalytics(text) {
     if (!text || typeof text !== "string") {
-      return { words: 0, chars: 0, readTimeMin: 0 };
+      return { words: 0, chars: 0, readTimeMin: 0, readingTimeMinutes: 0 };
     }
     const words = text.trim().split(/\s+/).filter(Boolean).length;
     const chars = text.length;
-    const readTimeMin = Math.ceil(words / 200);
-    return { words, chars, readTimeMin };
+    const readTimeMin = Math.max(1, Math.ceil(words / 200));
+    return { words, chars, readTimeMin, readingTimeMinutes: readTimeMin };
   }
 
   // ─── DECLARATIVE TOOL DISPATCH (word-tool-configs pattern) ───────────

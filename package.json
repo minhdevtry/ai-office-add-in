@@ -12,6 +12,7 @@
     "certs": "office-addin-dev-certs install --days 365",
     "test:e2e:word": "node --import tsx tests-e2e-word/runner.test.ts",
     "test:e2e:word:all": "npm run test:e2e:word",
+    "test:playwright": "npx playwright test",
     "audit:tools": "node scripts/tool-coverage-map.js",
     "test": "node --test tests/pure-modules.test.mjs"
   },
@@ -40,6 +41,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "office-addin-debugging": "^6.1.2",
     "office-addin-dev-certs": "^1.13.4",
     "office-addin-manifest": "^2.0.7",

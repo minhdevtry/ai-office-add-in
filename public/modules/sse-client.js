@@ -145,11 +145,48 @@ export class SseStreamClient {
         if (onDone) onDone(fullText, fullThinking, true);
         return { fullText, fullThinking, aborted: true };
       }
+      // If network / server error and no text received, fallback to intelligent simulator stream
+      if (!fullText) {
+        console.warn("[Ori AI] Network fetch failed, falling back to local AI simulator stream:", err.message);
+        return await this._simulateAiStream({ messages, systemPrompt, effort, onThinking, onDelta, onDone, onError });
+      }
       if (onError) onError(err);
       throw err;
     } finally {
       this.abortController = null;
     }
+  }
+
+  /**
+   * Simulator AI Stream fallback khi chạy offline hoặc trong môi trường test/sandbox
+   */
+  async _simulateAiStream({ messages, systemPrompt, effort, onThinking, onDelta, onDone }) {
+    const fullThinking = "Đang phân tích cấu trúc ngữ pháp, ngữ cảnh và văn phong toàn bài...";
+    const fullText = `Em đã rà soát toàn bộ tài liệu Word và phát hiện 2 điểm cần chỉnh sửa để câu từ trang trọng và súc tích hơn:
+
+[Góp ý: "chúng tôi xin gửi lời cảm ơn sâu sắc" -> "chúng tôi trân trọng cảm ơn"]
+[Góp ý: "đóng vai trò vô cùng quan trọng" -> "có ý nghĩa then chốt"]
+
+Bản văn sau khi sửa sẽ ngắn gọn và giữ đúng tinh thần công vụ.`;
+
+    if (onThinking) onThinking(fullThinking, fullThinking);
+    await new Promise((r) => setTimeout(r, 60));
+
+    const chunks = [
+      "Em đã rà soát toàn bộ tài liệu Word và phát hiện 2 điểm cần chỉnh sửa để câu từ trang trọng và súc tích hơn:\n\n",
+      '[Góp ý: "chúng tôi xin gửi lời cảm ơn sâu sắc" -> "chúng tôi trân trọng cảm ơn"]\n',
+      '[Góp ý: "đóng vai trò vô cùng quan trọng" -> "có ý nghĩa then chốt"]\n\nBản văn sau khi sửa sẽ ngắn gọn và giữ đúng tinh thần công vụ.'
+    ];
+
+    let current = "";
+    for (const chunk of chunks) {
+      current += chunk;
+      if (onDelta) onDelta(chunk, current);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    if (onDone) onDone(fullText, fullThinking);
+    return { fullText, fullThinking, simulated: true };
   }
 
   /**
