@@ -566,8 +566,25 @@ select {
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: var(--space-4);
   scroll-behavior: smooth;
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.message-bubble {
+  max-width: 88%;
+  min-width: 60px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  flex-shrink: 0;
 }
 
 /* ─── EMPTY STATE / WELCOME ───────────────────────────────────── */

@@ -1124,8 +1124,8 @@ class AppController {
         chip.addEventListener("click", async () => {
           try {
             await wordBridge.selectRange(clean);
+            // Visual feedback (không cần toast — user thích tính năng này không cần thông báo)
             chip.classList.add("jump-success");
-            this.showToast("🎯 Đã định vị và bôi đen đoạn văn trong Word!");
             setTimeout(() => chip.classList.remove("jump-success"), 1500);
           } catch (err) {
             this.showToast(`⚠️ ${err.message}`);
