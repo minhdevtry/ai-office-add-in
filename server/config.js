@@ -56,7 +56,7 @@ export const config = {
 
   // AI Provider (server-side, client KHÔNG được override)
   ai: {
-    endpoint: envString("AI_API_ENDPOINT", "https://aiapi.2tocom.space"),
+    endpoint: envString("AI_API_ENDPOINT", "https://aiapi.2tocom.space/v1/chat/completions"),
     apiKey: envString("AI_API_KEY", "keykeykeykeykeykeykeykey"),
     model: envString("AI_MODEL", "MiniMax-M3"),
     defaultEffort: normalizeEffort(envString("AI_DEFAULT_EFFORT", "medium")),

@@ -27,8 +27,9 @@ const publicDir = path.join(rootDir, "public");
 
 const app = express();
 
-// Trust Cloudflare proxy (vì tunnel forward X-Forwarded-For)
-app.set("trust proxy", true);
+// Trust Cloudflare proxy only (chỉ trust 1 hop từ Cloudflare edge)
+// KHÔNG dùng `true` (vì express-rate-limit báo lỗi ERR_ERL_PERMISSIVE_TRUST_PROXY)
+app.set("trust proxy", 1);
 
 // ─── CORS Whitelist ─────────────────────────────────────────────────────────
 // Chỉ cho phép origins trong config.corsOrigins, hỗ trợ wildcard *.officeapps.live.com

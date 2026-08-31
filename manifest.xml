@@ -8,10 +8,10 @@
 
   <Id>f47ac10b-58cc-4372-a567-0e02b2c3d479</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>AI Assistant</ProviderName>
+  <ProviderName>Ori AI</ProviderName>
   <DefaultLocale>vi-VN</DefaultLocale>
-  <DisplayName DefaultValue="Trợ lý AI Word" />
-  <Description DefaultValue="Trợ lý AI soạn thảo, biên tập, nhận xét lề trang và kết nối AI Agent thông minh trong Microsoft Word." />
+  <DisplayName DefaultValue="Ori AI" />
+  <Description DefaultValue="Ori AI — Trợ lý soạn thảo, biên tập và kết nối AI Agent trong Microsoft Word." />
   <IconUrl DefaultValue="https://word-bridge.2tocom.space/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://word-bridge.2tocom.space/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://word-bridge.2tocom.space" />
@@ -95,14 +95,14 @@
       </bt:Urls>
 
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Trợ lý AI Word" />
-        <bt:String id="AIAssistantGroup.Label" DefaultValue="Trợ lý AI" />
-        <bt:String id="AITaskpaneButton.Label" DefaultValue="Trợ lý AI" />
+        <bt:String id="GetStarted.Title" DefaultValue="Ori AI" />
+        <bt:String id="AIAssistantGroup.Label" DefaultValue="Ori AI" />
+        <bt:String id="AITaskpaneButton.Label" DefaultValue="Ori AI" />
       </bt:ShortStrings>
 
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Mở bảng trợ lý AI để hỗ trợ soạn thảo, biên tập và nhận xét tài liệu Word." />
-        <bt:String id="AITaskpaneButton.Tooltip" DefaultValue="Mở bảng điều khiển Trợ lý AI để sửa câu từ, tóm tắt, chèn bình luận lề trang và kết nối Agent." />
+        <bt:String id="GetStarted.Description" DefaultValue="Mở bảng điều khiển Ori AI để soạn thảo, biên tập và kết nối AI Agent trong Microsoft Word." />
+        <bt:String id="AITaskpaneButton.Tooltip" DefaultValue="Mở bảng điều khiển Ori AI để sửa câu từ, tóm tắt, chèn bình luận lề trang và kết nối Agent." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

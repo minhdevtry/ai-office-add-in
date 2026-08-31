@@ -48,13 +48,27 @@ class AppController {
     this.initEffortDropdown();
   }
 
+  /**
+   * Khởi tạo dropdown Effort (trong Settings modal) — bind sự kiện change
+   * Lưu vào localStorage (KHÔNG lưu vào document.settings)
+   */
+  initEffortDropdown() {
+    if (!this.dom.cfgEffort) return;
+    this.dom.cfgEffort.value = this.state.config.effort;
+    this.dom.cfgEffort.addEventListener("change", () => {
+      const effort = this.dom.cfgEffort.value;
+      this.state.config.effort = effort;
+      docState.saveEffort(effort);
+    });
+  }
+
   cacheDom() {
     this.dom = {
       statusPill: document.getElementById("statusPill"),
       statusText: document.getElementById("statusText"),
       btnToggleTheme: document.getElementById("btnToggleTheme"),
       btnSettings: document.getElementById("btnSettings"),
-      effortSelect: document.getElementById("effortSelect"),
+      cfgEffort: document.getElementById("cfgEffort"),
       skillsBar: document.getElementById("skillsBar"),
       contextBar: document.getElementById("contextBar"),
       contextTypeIcon: document.getElementById("contextTypeIcon"),
@@ -165,19 +179,6 @@ class AppController {
   }
 
   /**
-   * Khởi tạo dropdown Effort — bind sự kiện change
-   * Lưu vào localStorage (KHÔNG lưu vào document.settings)
-   */
-  initEffortDropdown() {
-    if (!this.dom.effortSelect) return;
-    this.dom.effortSelect.value = this.state.config.effort;
-    this.dom.effortSelect.addEventListener("change", () => {
-      const effort = this.dom.effortSelect.value;
-      this.state.config.effort = effort;
-      docState.saveEffort(effort);
-    });
-  }
-
   async loadSkills() {
     try {
       const res = await fetch("skills.json");
