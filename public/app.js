@@ -897,7 +897,8 @@ class AppController {
     bubble.className = `message-bubble ${role}`;
 
     if (role === "user") {
-      bubble.textContent = content;
+      // Strip leading emoji + khoảng trắng để bubble user gọn hơn (icon đã có ở starter card)
+      bubble.textContent = String(content).replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*/u, "").trim();
     } else if (role === "assistant") {
       if (thinking) {
         const thinkingBox = document.createElement("details");

@@ -673,6 +673,7 @@ select {
 /* ─── MESSAGE BUBBLES ─────────────────────────────────────────── */
 .message-bubble {
   max-width: 88%;
+  min-width: 60px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
@@ -686,6 +687,7 @@ select {
   background: var(--accent);
   color: var(--text-inverse);
   border-bottom-right-radius: 4px;
+  max-width: 80%;
 }
 
 .message-bubble.assistant {
@@ -694,6 +696,22 @@ select {
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
   border-bottom-left-radius: 4px;
+  max-width: 90%;
+}
+
+/* Streaming cursor */
+.streaming-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 1em;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 1s infinite;
+}
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 
 .thinking-box {
