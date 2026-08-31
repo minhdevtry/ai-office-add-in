@@ -569,13 +569,15 @@ select {
   overflow-y: auto;
   overflow-x: hidden;
   padding: var(--space-4);
-  display: block; /* không dùng flex — tránh co container theo child */
-  width: 100%;
-  max-width: 100%;
-  min-width: 280px;
+  display: table; /* table layout — ổn định hơn flex/block */
+  table-layout: fixed; /* columns width theo cấu hình, không co theo child */
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
   scroll-behavior: smooth;
   box-sizing: border-box;
   flex: 1 1 auto;
+  align-self: stretch;
 }
 
 /* Clearfix vì .message-bubble dùng float */
@@ -583,6 +585,26 @@ select {
   content: "";
   display: table;
   clear: both;
+}
+
+/* Empty state + starter card full width */
+.empty-state,
+.starter-grid,
+.welcome-hero {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+.starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100% !important;
+}
+.welcome-hero {
+  text-align: center;
+  margin-bottom: 16px;
 }
 
 .message-bubble {
@@ -656,8 +678,8 @@ select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  width: 100%;
-  max-width: 360px;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 .starter-card {
