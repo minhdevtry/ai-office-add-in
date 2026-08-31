@@ -7,9 +7,12 @@
   <link rel="icon" type="image/png" href="assets/icon-32.png">
   <!-- Office.js SDK -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <!-- marked + DOMPurify load từ CDN (Office iframe chặn bare import + tracking localStorage) -->
-  <script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
+  <!-- KHÔNG load marked/DOMPurify từ CDN vì:
+       1. Office iframe chặn bare specifier (browser không resolve 'marked')
+       2. CDN scripts là third-party → Tracking Prevention spam warnings mỗi lần
+          chúng access localStorage (không filter được vì browser-level)
+       → word-bridge.js dùng simpleMarkdownFallback (regex) thay thế. -->
+
   <!-- Main Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
