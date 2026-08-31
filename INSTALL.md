@@ -106,15 +106,48 @@ Lưu vào 1 vị trí dễ nhớ, ví dụ:
 
 #### 🅱️ Word Desktop trên Windows
 
-1. Mở Word
-2. Vào **File** → **Options** → **Trust Center** → **Trust Center Settings...**
+> **⚠️ Lưu ý:** "Trusted Add-in Catalogs" trong Trust Center chỉ dùng cho **shared network folders** (UNC paths), KHÔNG hoạt động với local folder thường. Dùng cách dưới đây.
+
+**Cách 1 (Recommend): Cài qua file manifest cục bộ**
+
+1. **Tải manifest về máy**: mở trình duyệt → truy cập `https://word-bridge.2tocom.space/manifest.xml` → Ctrl+S → lưu vào `C:\Users\<tên-user>\Documents\AI-Word-Addin\manifest.xml`
+2. **Mở Windows Explorer** → tìm file `manifest.xml` vừa lưu
+3. **Double-click** file `manifest.xml` → Word sẽ mở + hiện popup **"This add-in wants to make changes. Install?"** → bấm **Install**
+4. Đóng Word hoàn toàn → mở lại Word
+5. Ribbon **Home** → tìm nhóm **AI Assistant** ở **cuối ribbon** (bên phải) → nút **Trợ lý AI**
+
+**Cách 2: Cài từ trang Word trong Office (Workaround khi không double-click được)**
+
+1. Tải `manifest.xml` về máy (như bước 1 trên)
+2. Mở Word → **File** → **Options** → **Trust Center** → **Trust Center Settings...**
 3. Chọn **Trusted Add-in Catalogs** ở sidebar trái
-4. Ở mục **Catalog URL**, thêm đường dẫn thư mục chứa `manifest.xml`:
-   - Ví dụ: `C:\Users\YourName\Documents\AI-Word-Addin\`
-5. Tích **Show in Menu** → OK
-6. **Khởi động lại Word**
-7. Vào **Insert** → **My Add-ins** → **Shared Folder** → chọn **Trợ lý AI Word**
-8. Nút **Trợ lý AI** xuất hiện ở ribbon → click để mở
+4. Ở ô **Catalog URL**, paste đường dẫn dạng `file:///`:
+   ```
+   file:///C:/Users/YourName/Documents/AI-Word-Addin
+   ```
+5. Tích **Show in Menu** → OK → **khởi động lại Word**
+6. Vào **Insert** → **My Add-ins** → chọn tab **Shared Folder** (hoặc **Developer Add-ins** tùy phiên bản)
+7. Nếu thấy "Trợ lý AI Word" → click để thêm vào document
+8. Ribbon **Home** → cuộn sang phải → nhóm **AI Assistant** → nút **Trợ lý AI**
+
+**Cách 3 (Pro): Cài bằng PowerShell registry (chỉ dùng nếu 2 cách trên fail)**
+
+Mở PowerShell **as Administrator** rồi chạy:
+```powershell
+$manifestPath = "C:\Users\YourName\Documents\AI-Word-Addin\manifest.xml"
+$key = "HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedAddins\Trợ\ lý\ AI\ Word"
+New-Item -Path $key -Force | Out-Null
+Set-ItemProperty -Path $key -Name "Url" -Value $manifestPath
+Set-ItemProperty -Path $key -Name "Id" -Value "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+```
+(Trong đó `Id` lấy từ `<Id>...</Id>` trong manifest)
+
+Sau đó mở lại Word.
+
+**Vị trí nút trên ribbon:**
+- Nút **Trợ lý AI** nằm trong nhóm **AI Assistant** ở **tab Home**, vị trí **cuối ribbon** (bên phải, sau các nhóm Editing/Clipboard)
+- Nếu ribbon bị thu nhỏ, click nút **`>`** cuối ribbon để mở rộng
+- Hoặc kéo giãn cửa sổ Word rộng ra
 
 #### 🅲 Word Desktop trên macOS
 
