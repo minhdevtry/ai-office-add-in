@@ -44,6 +44,7 @@ licenseRouter.get("/public-config", (req, res) => {
     ok: true,
     aiModel: config.ai.model,
     aiDefaultEffort: config.ai.defaultEffort,
+    licenseRequired: config.license.required,
     // KHÔNG trả endpoint / apiKey / license info cá nhân
   });
 });

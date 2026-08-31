@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Ori AI</title>
+  <link rel="icon" type="image/png" href="assets/icon-32.png">
   <!-- Office.js SDK -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <!-- marked + DOMPurify load từ CDN (Office iframe chặn bare import + tracking localStorage) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
   <!-- Main Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -23,24 +27,12 @@
           <span class="status-dot"></span>
           <span id="statusText">Đang nối...</span>
         </div>
+        <!-- btnAnalytics removed (legacy) -->
         <button id="btnToggleTheme" class="icon-btn" title="Chuyển đổi Chế độ Sáng / Tối" aria-label="Toggle theme">☾</button>
+        <button id="btnSessions" class="icon-btn" title="Lịch sử phiên chat" aria-label="Sessions">🗂️</button>
         <button id="btnSettings" class="icon-btn" title="Cài đặt" aria-label="Settings">⚙</button>
       </div>
     </header>
-
-    <!-- ─── SKILLS BAR (HORIZONTAL CHIPS) ─── -->
-    <div id="skillsBar" class="skills-bar" title="Nhấp để áp dụng kỹ năng nhanh">
-      <!-- Skills dynamically injected here -->
-    </div>
-
-    <!-- ─── ACTIVE CONTEXT BAR ─── -->
-    <div id="contextBar" class="context-bar" style="display: none;">
-      <div class="context-chip">
-        <span id="contextTypeIcon" class="context-icon">⌖</span>
-        <span id="contextLabel">Đoạn chọn: 0 từ</span>
-      </div>
-      <button id="btnClearContext" class="context-btn-clear" title="Bỏ đính kèm ngữ cảnh" aria-label="Clear context">✕</button>
-    </div>
 
     <!-- ─── AGENT ACTIVE BANNER ─── -->
     <div id="agentBanner" class="agent-banner">
@@ -48,35 +40,46 @@
       <span id="agentBannerText">AI Agent đang thao tác tài liệu Word...</span>
     </div>
 
+    <!-- ─── PENDING COMMENTS PANEL (real-time, xuất hiện khi Agent ghim comment) ─── -->
+    <div id="pendingCommentsPanel" class="pending-comments-panel" style="display: none;">
+      <div class="pending-comments-header">
+        <span class="pending-comments-title">
+          💬 Nhận xét chờ duyệt (<span id="pendingCommentsCount">0</span>)
+        </span>
+        <span class="pending-comments-hint">Click ✓ để áp dụng & xoá, ✕ để bỏ qua</span>
+      </div>
+      <div id="pendingCommentsList" class="pending-comments-list"></div>
+    </div>
+
     <!-- ─── CHAT CONVERSATION AREA ─── -->
     <main id="chatContainer" class="chat-container">
       <div id="emptyHint" class="empty-state">
         <div class="welcome-hero">
-          <div class="welcome-mark">O</div>
-          <h2 class="welcome-title">Xin chào, tôi có thể giúp gì?</h2>
-          <p class="welcome-desc">Bôi đen văn bản trong Word hoặc chọn một kỹ năng bên dưới để bắt đầu.</p>
+          <img class="welcome-logo" src="assets/icon-80.png" alt="Ori AI" />
+          <h2 class="welcome-title">Xin chào, tôi là Ori AI Agent</h2>
+          <p class="welcome-desc">Tôi đang đọc toàn bộ tài liệu Word của bạn. Hỏi tôi bất cứ điều gì — ví dụ: <em>"Soát lỗi chính tả"</em>, <em>"Góp ý văn phong"</em>, <em>"Viết lại đoạn 2 mượt hơn"</em>.</p>
         </div>
 
         <div class="starter-grid">
           <div class="starter-card" data-skill="polish">
-            <span class="starter-icon">✎</span>
+            <span class="starter-icon">✍️</span>
             <span class="starter-title">Viết lại mượt</span>
             <span class="starter-subtitle">Trôi chảy, tự nhiên</span>
           </div>
           <div class="starter-card" data-skill="grammar">
-            <span class="starter-icon">✓</span>
-            <span class="starter-title">Sửa chính tả</span>
-            <span class="starter-subtitle">Dấu câu & ngữ pháp</span>
+            <span class="starter-icon">🔍</span>
+            <span class="starter-title">Soát lỗi chính tả</span>
+            <span class="starter-subtitle">Comment real-time từng lỗi</span>
           </div>
           <div class="starter-card" data-skill="formal">
-            <span class="starter-icon">§</span>
+            <span class="starter-icon">👔</span>
             <span class="starter-title">Trang trọng hóa</span>
             <span class="starter-subtitle">Văn phong hành chính</span>
           </div>
-          <div class="starter-card" data-skill="comment_review">
-            <span class="starter-icon">◇</span>
-            <span class="starter-title">Góp ý lề trang</span>
-            <span class="starter-subtitle">Nhận xét bên phải</span>
+          <div class="starter-card" data-skill="ai_proof">
+            <span class="starter-icon">🕵️</span>
+            <span class="starter-title">Sửa văn phong AI</span>
+            <span class="starter-subtitle">Bỏ sáo rỗng, giữ hơi thở người</span>
           </div>
         </div>
       </div>
@@ -85,14 +88,7 @@
     <!-- ─── COMPOSER FOOTER ─── -->
     <footer class="composer-footer">
       <div class="composer-toolbar">
-        <div class="toolbar-left">
-          <button id="btnReadSelection" class="tool-chip-btn" title="Đọc đoạn đang bôi đen">
-            <span class="tool-icon">⌖</span> Bôi đen
-          </button>
-          <button id="btnReadDoc" class="tool-chip-btn" title="Đọc toàn bộ tài liệu">
-            <span class="tool-icon">¶</span> Toàn bài
-          </button>
-        </div>
+        <div class="toolbar-left"></div>
         <div class="toolbar-right">
           <button id="btnClearChat" class="tool-chip-btn" title="Xóa lịch sử chat">
             <span class="tool-icon">⌫</span> Xóa chat
@@ -101,10 +97,16 @@
       </div>
 
       <div class="input-box-wrapper">
+        <!-- ─── SLASH COMMANDS POPUP ─── -->
+        <div id="slashMenu" class="slash-menu" style="display: none;">
+          <div class="slash-menu-header">Kỹ năng nhanh (gõ / để mở)</div>
+          <div id="slashMenuList" class="slash-menu-list"></div>
+        </div>
+
         <textarea
           id="chatInput"
           class="chat-input"
-          placeholder="Nhập yêu cầu hoặc câu hỏi về bài viết..."
+          placeholder="Nhập yêu cầu hoặc câu hỏi về bài viết (gõ / để chọn kỹ năng)..."
           rows="1"
         ></textarea>
         <button id="btnSend" class="send-btn" title="Gửi yêu cầu" aria-label="Send">
@@ -147,9 +149,57 @@
           <span class="form-help">Cao hơn = suy nghĩ sâu hơn nhưng chậm hơn.</span>
         </div>
 
+        <details class="settings-advanced">
+          <summary class="form-label" style="cursor: pointer;">🔌 Nguồn AI tùy chỉnh (nâng cao)</summary>
+          <span class="form-help">Mặc định dùng server proxy của Ori AI. Bật 1 trong 3 layer dưới đây để dùng key riêng (OpenRouter, Anthropic direct, llama.cpp local...).</span>
+
+          <div class="form-group" style="margin-top: 8px;">
+            <label class="form-label">
+              <input type="checkbox" id="cfgStreamProxyEnabled" />
+              Layer 1: StreamProxy (server giữ key)
+            </label>
+            <input id="cfgStreamProxyUrl" type="text" class="form-input" placeholder="https://your-proxy.com/v1/chat/completions" />
+            <input id="cfgStreamProxyToken" type="password" class="form-input" placeholder="Bearer token" />
+            <span class="form-help">Ưu tiên cao nhất. Server proxy của bạn giữ API key.</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="cfgCorsProxyEnabled" />
+              Layer 2: CORS Proxy (browser rewrite ?url=)
+            </label>
+            <input id="cfgCorsProxyUrl" type="text" class="form-input" placeholder="https://corsproxy.io/?" />
+            <span class="form-help">Nếu provider không hỗ trợ CORS, route qua proxy này.</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="cfgDirectEnabled" />
+              Layer 3: Direct (browser gọi thẳng provider)
+            </label>
+            <input id="cfgDirectBaseURL" type="text" class="form-input" placeholder="https://api.openai.com/v1" />
+            <input id="cfgDirectApiKey" type="password" class="form-input" placeholder="sk-..." />
+            <span class="form-help">⚠️ API key sẽ lưu localStorage. Chỉ dùng khi tin tưởng thiết bị này.</span>
+          </div>
+        </details>
+
       </div>
       <div class="modal-footer">
         <button id="btnSaveSettings" class="btn primary">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SESSIONS MODAL (IndexedDB checkpointer) ─── -->
+  <div id="sessionsModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">🗂️ Lịch sử phiên chat</h3>
+        <button id="btnCloseSessions" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-help" style="margin-bottom: 12px;">Mỗi file Word có 1 phiên riêng. Click vào phiên để khôi phục, 🗑️ để xoá.</p>
+        <div id="sessionsList" class="sessions-list"></div>
       </div>
     </div>
   </div>
@@ -181,6 +231,6 @@
   </div>
 
   <!-- Main JavaScript App Module -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2.3.0"></script>
 </body>
 </html>

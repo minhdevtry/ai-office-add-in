@@ -1,9 +1,16 @@
 /**
  * SSE Stream Client Module
- * Tiếp nhận luồng Server-Sent Events từ Backend, tách nhỏ token-by-token và bóc tách Thinking mode
+ * Tiếp nhập luồng Server-Sent Events từ Backend, tách nhỏ token-by-token và bóc tách Thinking mode
+ *
+ * Endpoint có thể resolve qua 3 layer (stream-factory.js):
+ *  1. StreamProxy (server-side, Bearer token)
+ *  2. CORS Proxy (client-side rewrite)
+ *  3. Direct (browser → provider với key localStorage)
+ *  4. Default: server proxy /api/chat (zero-config fallback)
  */
 
-import { docState } from "./doc-state.js";
+import { docState } from "./doc-state.js?v=2.1.0";
+import { resolveStreamEndpoint } from "./stream-factory.js?v=2.1.0";
 
 export class SseStreamClient {
   constructor(endpointUrl = "/api/chat") {
@@ -46,10 +53,19 @@ export class SseStreamClient {
     let fullThinking = "";
 
     try {
-      const response = await fetch(this.endpointUrl, {
+      // Resolve endpoint: ưu tiên streamProxy/CORS/direct từ stream-factory
+      let resolved = null;
+      try {
+        resolved = await resolveStreamEndpoint({ messages, systemPrompt, effort });
+      } catch (_) {}
+      const finalUrl = resolved?.url || this.endpointUrl;
+      const extraHeaders = resolved?.headers || {};
+
+      const response = await fetch(finalUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...extraHeaders,
           ...this.getLicenseHeaders(),
         },
         body: JSON.stringify({

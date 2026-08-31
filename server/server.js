@@ -58,9 +58,22 @@ app.use(
 
 app.use(express.json({ limit: "20mb" }));
 
+// Không cache static files trong development & taskpane updates
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 // Serve static assets và giao diện Taskpane
-app.use(express.static(publicDir));
-app.use("/assets", express.static(path.join(rootDir, "assets")));
+app.use(express.static(publicDir, { etag: false, maxAge: 0 }));
+app.use("/assets", express.static(path.join(rootDir, "assets"), { etag: false, maxAge: 0 }));
+
+// Serve favicon.ico
+app.get("/favicon.ico", (req, res) => {
+  res.sendFile(path.join(rootDir, "assets", "icon-32.png"));
+});
 
 // Serve manifest.xml ở root URL (Office cần fetch tại /manifest.xml)
 app.get("/manifest.xml", (req, res) => {

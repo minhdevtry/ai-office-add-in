@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>e2e30000-0000-0000-0000-000000000003</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Ori AI E2E</ProviderName>
+  <DefaultLocale>vi-VN</DefaultLocale>
+  <DisplayName DefaultValue="Ori AI E2E Test" />
+  <Description DefaultValue="E2E test taskpane for Ori AI Word Bridge." />
+
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+
+  <Requirements>
+    <Sets DefaultMinVersion="1.4">
+      <Set Name="WordApi" MinVersion="1.4" />
+    </Sets>
+  </Requirements>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3003/test-taskpane.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_1">
+    <Hosts>
+      <Host xsi:type="Document">
+        <!-- LaunchEvent: auto-fire onWordLaunch khi mở doc mới → test-taskpane chạy ngay -->
+        <ExtensionPoint xsi:type="LaunchEvent">
+          <LaunchEvents>
+            <LaunchEvent Type="OnNewDocument" FunctionExecution="asynchronous" FunctionName="onWordLaunch" />
+          </LaunchEvents>
+        </ExtensionPoint>
+
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+          </GetStarted>
+
+          <FunctionFile resid="Commands.Url" />
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="E2EGroup">
+                <Label resid="E2EGroup.Label" />
+                <Control xsi:type="Button" id="E2ERunBtn">
+                  <Label resid="E2ERunBtn.Label" />
+                  <Supertip>
+                    <Title resid="E2ERunBtn.Label" />
+                    <Description resid="E2ERunBtn.Tooltip" />
+                  </Supertip>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>onWordLaunch</FunctionName>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3003/test-taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Ori AI E2E" />
+        <bt:String id="GetStarted.Description" DefaultValue="Chạy toàn bộ E2E test trong Word thật." />
+        <bt:String id="E2EGroup.Label" DefaultValue="E2E Tests" />
+        <bt:String id="E2ERunBtn.Label" DefaultValue="Run E2E" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="E2ERunBtn.Tooltip" DefaultValue="Chạy lại toàn bộ test (markdown, search, comment, accept, resolve, track changes)." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

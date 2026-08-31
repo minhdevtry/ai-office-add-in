@@ -57,8 +57,8 @@
     "id": "comment_review",
     "icon": "💬",
     "label": "Nhận xét lề trang",
-    "tip": "Đưa ra đánh giá, nhận xét bên lề tài liệu",
-    "prompt": "Đóng vai trò là một biên tập viên chuyên nghiệp, hãy đưa ra nhận xét, đánh giá ưu/nhược điểm và gợi ý cải thiện cho đoạn văn bản sau.",
+    "tip": "Đưa ra đánh giá, nhận xét ghim vào mép lề tài liệu",
+    "prompt": "Đóng vai trò là một biên tập viên chuyên nghiệp, hãy rà soát đoạn văn sau và đưa ra các góp ý cụ thể. Với mỗi điểm cần góp ý, hãy định dạng chính xác theo cú pháp:\n[Góp ý: \"đoạn câu văn cần sửa trong bài\" -> Nội dung góp ý cụ thể]\nVí dụ:\n[Góp ý: \"Chúng tôi xin cam kết\" -> Cụm từ này hơi sáo rỗng, nên đổi thành 'Chúng tôi cam đoan']",
     "context": "selection",
     "defaultMode": "comment"
   },

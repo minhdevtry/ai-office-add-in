@@ -6,8 +6,8 @@
  *  - Tự động gắn X-License-Key + X-Client-Id headers vào fetch
  */
 
-import { docState } from "./doc-state.js";
-import { getOrCreateDeviceId } from "./device-fingerprint.js";
+import { docState } from "./doc-state.js?v=2.1.0";
+import { getOrCreateDeviceId } from "./device-fingerprint.js?v=2.1.0";
 
 const API_BASE = "/api/license";
 

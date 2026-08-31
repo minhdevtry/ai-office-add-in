@@ -27,6 +27,52 @@ const LOCAL_KEYS = {
   DEVICE_ID: "ai_word.device_id",
 };
 
+// Safe memory fallback khi trình duyệt chặn localStorage (Tracking Prevention / Third-party cookies)
+const memoryStore = new Map();
+let isStorageWorking = null;
+
+function checkStorage() {
+  if (isStorageWorking !== null) return isStorageWorking;
+  try {
+    const testKey = "__ori_storage_test__";
+    window.localStorage.setItem(testKey, "1");
+    window.localStorage.removeItem(testKey);
+    isStorageWorking = true;
+  } catch (_) {
+    isStorageWorking = false;
+  }
+  return isStorageWorking;
+}
+
+function safeStorageGet(key) {
+  if (checkStorage()) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (_) {}
+  }
+  return memoryStore.get(key) || null;
+}
+
+function safeStorageSet(key, value) {
+  if (checkStorage()) {
+    try {
+      window.localStorage.setItem(key, value);
+      return;
+    } catch (_) {}
+  }
+  memoryStore.set(key, value);
+}
+
+function safeStorageRemove(key) {
+  if (checkStorage()) {
+    try {
+      window.localStorage.removeItem(key);
+      return;
+    } catch (_) {}
+  }
+  memoryStore.delete(key);
+}
+
 export class DocumentStateManager {
   constructor() {
     this._saveTimer = null;
@@ -54,7 +100,7 @@ export class DocumentStateManager {
     }
 
     try {
-      const stored = localStorage.getItem(key);
+      const stored = safeStorageGet(key);
       return stored ? JSON.parse(stored) : defaultVal;
     } catch (_) {
       return defaultVal;
@@ -74,7 +120,7 @@ export class DocumentStateManager {
     }
 
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      safeStorageSet(key, JSON.stringify(value));
     } catch (_) {}
   }
 
@@ -83,7 +129,7 @@ export class DocumentStateManager {
    */
   getLocal(key, defaultVal = null) {
     try {
-      const stored = localStorage.getItem(key);
+      const stored = safeStorageGet(key);
       return stored ? JSON.parse(stored) : defaultVal;
     } catch (_) {
       return defaultVal;
@@ -95,7 +141,7 @@ export class DocumentStateManager {
    */
   setLocal(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      safeStorageSet(key, JSON.stringify(value));
     } catch (_) {}
   }
 
@@ -131,7 +177,37 @@ export class DocumentStateManager {
   loadSystemPrompt() {
     return this.get(
       SETTINGS_KEYS.SYS_PROMPT,
-      "Bạn là một Trợ lý AI chuyên nghiệp hỗ trợ soạn thảo và biên tập văn bản tiếng Việt trong Microsoft Word."
+      `Bạn là Ori AI Agent — trợ lý soạn thảo & biên tập tích hợp trong Microsoft Word. Bạn hành xử chủ động, sắc sảo, tận tâm bảo vệ sự trong sáng của tiếng Việt.
+
+## CÁCH BẠN HÀNH XỬ (PHONG CÁCH AI AGENT)
+- **Đọc toàn bộ tài liệu trước khi trả lời** — bạn luôn nhận được toàn văn trong khối [Tài liệu Word đang mở].
+- **Đi thẳng vào việc, không vòng vo.** Đừng mở đầu bằng "Tôi là AI, tôi sẽ giúp bạn...". Cứ bắt tay vào việc.
+- **Khi có lỗi / vấn đề, ghim comment vào lề trang Word bằng marker** [Góp ý: "anchor" -> "sửa thành"]. Mỗi marker sẽ tự động spawn một comment real-time ở mép lề, kèm nút ✓ Áp dụng / ✕ Bỏ qua bên sidebar.
+- **Bản sửa hoàn chỉnh** (nếu user muốn xem toàn bộ văn bản đã sửa): đặt giữa hai dòng \`---\` ở cuối response.
+
+## CÚ PHÁP MARKER (BẮT BUỘC KHI MUỐN GỌI Ý HÀNH ĐỘNG)
+Mỗi gợi ý chỉnh sửa / lỗi cần sửa đều phải đi kèm 1 marker ở dạng:
+\`\`\`
+[Góp ý: "đoạn text gốc cần sửa trong bài" -> "đoạn text thay thế"]
+\`\`\`
+- Phần trước \`->\` phải là CHÍNH XÁC đoạn text xuất hiện trong tài liệu (để Agent có thể tìm anchor).
+- Phần sau \`->\` là đề xuất thay thế.
+- Mỗi marker sinh ra MỘT comment ở lề Word với prefix "[Ori Agent]". User sẽ thấy nó xuất hiện real-time khi bạn viết.
+- Ví dụ hợp lệ:
+  [Góp ý: "tôi đã đi đến" -> "tôi đã đến"]
+  [Góp ý: "rất là rất nhiều" -> "rất nhiều"]
+
+## NGUYÊN TẮC BIÊN TẬP
+1. Cắt sáo rỗng: "không chỉ là X mà còn là Y", "sâu sắc và toàn diện", "bản giao hưởng", "bức tranh toàn cảnh", "vũ trụ bao la", "chìa khóa mở ra"...
+2. Từ đệm vô nghĩa: "thực chất", "về cơ bản", "có thể nói rằng", "đóng vai trò quan trọng".
+3. Tôn trọng nhịp điệu: câu ngắn dứt khoát kết hợp câu dài uyển chuyển; dùng từ chính xác, gợi hình, chuẩn chính tả tiếng Việt.
+
+## ĐỊNH DẠNG ĐÁP ỨNG
+- Mở đầu ngắn gọn (1-2 câu) tóm tắt phát hiện. Ví dụ: "Em thấy 3 chỗ cần chỉnh:" / "Bản viết lại mượt hơn rồi:" / "Em tìm được 2 lỗi chính tả:".
+- Sau đó liệt kê marker [Góp ý: ...] (mỗi marker = 1 comment ở lề Word).
+- Cuối cùng (nếu có bản văn sửa hoàn chỉnh) đặt trong \`---\`...\`---\`.
+- **KHÔNG dùng markdown trong phần nội dung ghim vào Word** (text gốc, text thay thế trong marker, text trong \`---\`).
+- **ĐƯỢC dùng markdown** ở phần giải thích bên ngoài marker.`
     );
   }
 
@@ -169,7 +245,7 @@ export class DocumentStateManager {
 
   clearLicense() {
     try {
-      localStorage.removeItem(LOCAL_KEYS.LICENSE);
+      safeStorageRemove(LOCAL_KEYS.LICENSE);
     } catch (_) {}
   }
 
@@ -186,4 +262,4 @@ export class DocumentStateManager {
 }
 
 export const docState = new DocumentStateManager();
-export { LOCAL_KEYS };
+export { LOCAL_KEYS, safeStorageGet, safeStorageSet, safeStorageRemove };

@@ -3,8 +3,8 @@
  * Lắng nghe các lệnh điều khiển từ AI Agent ngoài (MCP Server) và thực thi trên Office.js
  */
 
-import { wordBridge } from "./word-bridge.js";
-import { docState } from "./doc-state.js";
+import { wordBridge } from "./word-bridge.js?v=2.1.0";
+import { docState } from "./doc-state.js?v=2.1.0";
 
 export class WordWsClient {
   constructor() {
@@ -168,6 +168,24 @@ export class WordWsClient {
 
       case "insertComment":
         return await wordBridge.insertComment(op.commentText, op.anchor);
+
+      case "getComments":
+        return await wordBridge.getComments();
+
+      case "acceptComment":
+        return await wordBridge.acceptComment({
+          anchorText: op.anchorText,
+          replacementText: op.replacementText,
+        });
+
+      case "deleteComment":
+        return await wordBridge.deleteComment({ anchorText: op.anchorText });
+
+      case "replyComment":
+        return await wordBridge.replyToComment({
+          anchorText: op.anchorText,
+          replyText: op.replyText,
+        });
 
       case "insertOoxml":
         return await wordBridge.insertOoxml(op.anchor, op.ooxml, op.location);

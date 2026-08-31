@@ -310,4 +310,112 @@ export const tools = [
       },
     },
   },
+  {
+    name: "word_getComments",
+    description: "Liệt kê tất cả margin comments trong tài liệu Word (id, anchor, content, author).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", const: "getComments" },
+      },
+    },
+  },
+  {
+    name: "word_acceptComment",
+    description: "Chấp nhận 1 comment từ Ori Agent: thay text trong range bằng replacementText, rồi xoá comment. Khi user bấm 'Áp dụng' trên panel bên sidebar, tool này được gọi.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", const: "acceptComment" },
+        anchorText: {
+          type: "string",
+          description: "Đoạn text gốc trong bài (phía trước -> trong marker).",
+        },
+        replacementText: {
+          type: "string",
+          description: "Đoạn text thay thế (phía sau -> trong marker).",
+        },
+      },
+      required: ["anchorText", "replacementText"],
+    },
+  },
+  {
+    name: "word_deleteComment",
+    description: "Xoá 1 comment theo anchor text mà không thay text.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", const: "deleteComment" },
+        anchorText: { type: "string", description: "Anchor text của comment cần xoá." },
+      },
+      required: ["anchorText"],
+    },
+  },
+  {
+    name: "word_replyComment",
+    description: "Reply (threaded) vào 1 margin comment trong Word.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", const: "replyComment" },
+        anchorText: { type: "string", description: "Anchor của comment cha." },
+        replyText: { type: "string", description: "Nội dung reply." },
+      },
+      required: ["anchorText", "replyText"],
+    },
+  },
 ];
+
+// ─── CONFIG-DRIVEN DISPATCH (dùng word-tool-configs) ─────────────────────
+// Pattern office-coding-agent: 1 nguồn truth cho cả MCP + UI + E2E.
+// MCP server chỉ cần gọi wordBridge.executeTool(toolName, args).
+
+import path from "path";
+import { pathToFileURL } from "url";
+
+/**
+ * Load word-tool-configs từ file ESM của client (convert sang JSON Schema tương thích MCP).
+ * Lưu ý: file là ESM với import Word.js runtime — không chạy được ở server Node.
+ * → Ta tái khai báo schema từ config.params (read-once bằng regex nhẹ) để giữ schema MCP chuẩn.
+ *
+ * Workaround đơn giản: định nghĩa BẢNG ÁNH XẠ MCP <-> config ở đây.
+ * Khi cần đổi tool, sửa cả 2 chỗ (configs ở client + tools.js ở server).
+ * Khi muốn auto-sync, dùng script generate.
+ */
+const CONFIG_TO_MCP_TOOLS = [
+  { configName: "word_read_selection", mcpName: "word_getSelection", kind: "getSelection" },
+  { configName: "word_read_document", mcpName: "word_getText", kind: "getText" },
+  { configName: "word_read_paragraphs", mcpName: "word_getParagraphs", kind: "getParagraphs" },
+  { configName: "word_search_text", mcpName: "word_searchText", kind: "searchText" },
+  { configName: "word_insert_text", mcpName: "word_insertAfterText", kind: "insertAfterText" },
+  { configName: "word_insert_markdown", mcpName: "word_insertMarkdown", kind: "insertMarkdown" },
+  { configName: "word_insert_comment", mcpName: "word_insertComment", kind: "insertComment" },
+  { configName: "word_accept_comment", mcpName: "word_acceptComment", kind: "acceptComment" },
+  { configName: "word_resolve_comment", mcpName: "word_resolveComment", kind: "resolveComment" },
+  { configName: "word_insert_with_track_changes", mcpName: "word_insertWithTrackChanges", kind: "insertWithTrackChanges" },
+  { configName: "word_get_tracked_changes", mcpName: "word_getTrackedChanges", kind: "getTrackedChanges" },
+  // 6 tools mới fill coverage gap
+  { configName: "word_find_replace", mcpName: "word_findReplace", kind: "findReplace" },
+  { configName: "word_delete_text", mcpName: "word_deleteText", kind: "deleteText" },
+  { configName: "word_set_paragraph_style", mcpName: "word_setParagraphStyle", kind: "setParagraphStyle" },
+  { configName: "word_select_range", mcpName: "word_selectRange", kind: "selectRange" },
+  { configName: "word_insert_ooxml", mcpName: "word_insertOoxml", kind: "insertOoxml" },
+  { configName: "word_get_text_analytics", mcpName: "word_getTextAnalytics", kind: "getTextAnalytics" },
+];
+
+/**
+ * Dispatch 1 op đến Word client thông qua wordBridge.executeTool trong task pane.
+ * Tool đã có sẵn JSON Schema trong tools[] (ở trên) — khi user (AI Agent) gọi MCP,
+ * server chỉ cần forward op.kind (đã strip word_ prefix) sang task pane.
+ */
+async function dispatchViaConfig(clientManager, op, targetClientId) {
+  // Tìm tool config theo kind
+  const configMapping = CONFIG_TO_MCP_TOOLS.find((m) => m.kind === op.kind);
+  if (!configMapping) {
+    // Fallback: dispatch kiểu cũ (cho tool không có config)
+    return await clientManager.dispatchOp(op, { targetClientId, timeoutMs: 15000 });
+  }
+  // Task pane sẽ execute tool qua wordBridge.executeTool(name, args)
+  // (forward từ server tới task pane qua WS, task pane dispatch nội bộ)
+  return await clientManager.dispatchOp(op, { targetClientId, timeoutMs: 15000 });
+}

@@ -4,7 +4,7 @@
  * Được dùng làm `X-Client-Id` cho license binding.
  */
 
-import { docState } from "./doc-state.js";
+import { docState } from "./doc-state.js?v=2.1.0";
 
 function uuidv4() {
   // RFC 4122 v4
@@ -29,7 +29,5 @@ export function getOrCreateDeviceId() {
 }
 
 export function clearDeviceId() {
-  try {
-    localStorage.removeItem("ai_word.device_id");
-  } catch (_) {}
+  docState.saveDeviceId(null);
 }

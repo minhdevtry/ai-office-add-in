@@ -9,7 +9,11 @@
     "dev": "node --watch server/server.js",
     "mcp": "node server/mcp-server.js",
     "validate": "office-addin-manifest validate manifest.xml",
-    "certs": "office-addin-dev-certs install --days 365"
+    "certs": "office-addin-dev-certs install --days 365",
+    "test:e2e:word": "node --import tsx tests-e2e-word/runner.test.ts",
+    "test:e2e:word:all": "npm run test:e2e:word",
+    "audit:tools": "node scripts/tool-coverage-map.js",
+    "test": "node --test tests/pure-modules.test.mjs"
   },
   "keywords": [
     "word",
@@ -27,14 +31,18 @@
     "@modelcontextprotocol/sdk": "^1.6.1",
     "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.5",
+    "dompurify": "^3.4.14",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.4.0",
+    "marked": "^18.0.11",
     "uuid": "^11.1.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "office-addin-debugging": "^6.1.2",
     "office-addin-dev-certs": "^1.13.4",
-    "office-addin-manifest": "^2.0.7"
+    "office-addin-manifest": "^2.0.7",
+    "tsx": "^4.23.13"
   }
 }
