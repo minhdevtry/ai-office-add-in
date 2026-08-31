@@ -18,7 +18,6 @@
 
   <AppDomains>
     <AppDomain>https://word-bridge.2tocom.space</AppDomain>
-    <AppDomain>https://word-bridge.2tocom.space</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -79,6 +78,36 @@
             </OfficeTab>
           </ExtensionPoint>
         </DesktopFormFactor>
+
+        <!-- Mobile form factor (Word mobile/tablet) -->
+        <MobileFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <Group id="AIAssistantGroup.Mobile">
+              <Label resid="AIAssistantGroup.Label" />
+              <Icon>
+                <bt:Image size="16" resid="Icon.16x16" />
+                <bt:Image size="32" resid="Icon.32x32" />
+                <bt:Image size="80" resid="Icon.80x80" />
+              </Icon>
+              <Control xsi:type="Button" id="AITaskpaneButton.Mobile">
+                <Label resid="AITaskpaneButton.Label" />
+                <Supertip>
+                  <Title resid="AITaskpaneButton.Label" />
+                  <Description resid="AITaskpaneButton.Tooltip" />
+                </Supertip>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Action xsi:type="ShowTaskpane">
+                  <TaskpaneId>AIWordTaskpane</TaskpaneId>
+                  <SourceLocation resid="Taskpane.Url" />
+                </Action>
+              </Control>
+            </Group>
+          </ExtensionPoint>
+        </MobileFormFactor>
       </Host>
     </Hosts>
 
