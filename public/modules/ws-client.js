@@ -4,6 +4,7 @@
  */
 
 import { wordBridge } from "./word-bridge.js";
+import { docState } from "./doc-state.js";
 
 export class WordWsClient {
   constructor() {
@@ -18,6 +19,19 @@ export class WordWsClient {
     return `${proto}//${window.location.host}/ws`;
   }
 
+  /**
+   * Lấy license headers từ localStorage (per-user).
+   * Trả về empty object nếu chưa có license (dev mode).
+   */
+  getLicenseHeaders() {
+    const lic = docState.loadLicense();
+    if (!lic?.licenseKey || !lic?.deviceId) return {};
+    return {
+      "X-License-Key": lic.licenseKey,
+      "X-Client-Id": lic.deviceId,
+    };
+  }
+
   connect() {
     if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) {
       return;
@@ -27,7 +41,19 @@ export class WordWsClient {
     if (this.onStatusChange) this.onStatusChange("connecting");
 
     try {
-      this.ws = new WebSocket(url);
+      // Browser WebSocket API không hỗ trợ custom headers trong constructor.
+      // Phải dùng Sec-WebSocket-Protocol trick hoặc attach query string.
+      // Ở đây ta attach device-id vào query để server đọc được.
+      const lic = docState.loadLicense();
+      let fullUrl = url;
+      if (lic?.licenseKey && lic?.deviceId) {
+        const params = new URLSearchParams({
+          k: lic.licenseKey,
+          d: lic.deviceId,
+        });
+        fullUrl = `${url}?${params.toString()}`;
+      }
+      this.ws = new WebSocket(fullUrl);
     } catch (_) {
       this.scheduleReconnect();
       return;
@@ -127,14 +153,11 @@ export class WordWsClient {
 
       case "insertAfterText": {
         if (!op.anchor || !op.text) throw new Error("Thiếu tham số 'anchor' hoặc 'text'");
-        if (op.asParagraph) {
-          await wordBridge.selectRange(op.anchor);
-          await wordBridge.insertParagraphAfter(op.text);
-          if (op.style) await wordBridge.setParagraphStyle(op.text, op.style);
-        } else {
-          await wordBridge.findReplace(op.anchor, `${op.anchor} ${op.text}`, true, false, 1);
-        }
-        return { ok: true };
+        // Dùng native search + insertText/insertParagraph (gọn và chính xác hơn findReplace hack)
+        return await wordBridge.insertAfterAnchor(op.anchor, op.text, {
+          asParagraph: !!op.asParagraph,
+          style: op.style || null,
+        });
       }
 
       case "deleteText":

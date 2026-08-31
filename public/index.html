@@ -23,8 +23,15 @@
           <span class="status-dot"></span>
           <span id="statusText">Đang nối...</span>
         </div>
+        <select id="effortSelect" class="effort-select" title="Mức độ suy luận của AI (server-side)">
+          <option value="off">🧠 Tắt</option>
+          <option value="low">🧠 Thấp</option>
+          <option value="medium" selected>🧠 Vừa</option>
+          <option value="high">🧠 Cao</option>
+          <option value="xhigh">🧠 Rất cao</option>
+        </select>
         <button id="btnToggleTheme" class="icon-btn" title="Chuyển đổi Chế độ Sáng / Tối">🌙</button>
-        <button id="btnSettings" class="icon-btn" title="Cài đặt mô hình & Giọng văn">⚙️</button>
+        <button id="btnSettings" class="icon-btn" title="Cài đặt & Giọng văn">⚙️</button>
       </div>
     </header>
 
@@ -123,38 +130,6 @@
         <button id="btnCloseSettings" class="icon-btn">✕</button>
       </div>
       <div class="modal-body">
-        
-        <div class="form-group">
-          <label class="form-label">AI Endpoint (Gateway URL)</label>
-          <input
-            id="cfgEndpoint"
-            type="text"
-            class="form-input"
-            placeholder="https://api.deepseek.com/chat/completions"
-          />
-          <span class="form-help">Hỗ trợ DeepSeek, OpenAI, Claude, Gemini hoặc Gateway nội bộ.</span>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">API Key</label>
-          <input
-            id="cfgApiKey"
-            type="password"
-            class="form-input"
-            placeholder="sk-..."
-          />
-          <span class="form-help">Khóa API được lưu an toàn cục bộ trong máy tính của bạn.</span>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Tên Mô Hình (Model)</label>
-          <input
-            id="cfgModel"
-            type="text"
-            class="form-input"
-            placeholder="deepseek-chat (hoặc claude-3-5-sonnet, gpt-4o)"
-          />
-        </div>
 
         <div class="form-group">
           <label class="form-label">🧠 Giọng văn cá nhân mẫu (House Voice)</label>
@@ -167,10 +142,72 @@
           <span class="form-help">AI sẽ tự động mô phỏng nhịp điệu và câu từ của đoạn mẫu này trong mọi câu trả lời.</span>
         </div>
 
+        <div class="form-group">
+          <label class="form-label">🔐 Bản quyền</label>
+          <div id="licenseInfo" class="license-info">
+            <div class="license-row">
+              <span class="license-label">Email:</span>
+              <span id="licEmailDisplay" class="license-value">—</span>
+            </div>
+            <div class="license-row">
+              <span class="license-label">Thiết bị:</span>
+              <span id="licDeviceDisplay" class="license-value">—</span>
+            </div>
+            <p class="form-help">Endpoint, API Key và Model được cấu hình an toàn phía server. Bạn không cần nhập tại đây.</p>
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
-        <button id="btnTestConn" class="btn secondary">Kiểm tra kết nối</button>
         <button id="btnSaveSettings" class="btn primary">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── LICENSE ACTIVATION MODAL (persistent, block UI nếu chưa activate) ── -->
+  <div id="licenseModal" class="modal-overlay" data-persistent="true">
+    <div class="modal-card license-card">
+      <div class="modal-header">
+        <h3 class="modal-title"><span>🔐</span> Kích hoạt bản quyền</h3>
+      </div>
+      <div class="modal-body">
+        <p class="form-help" style="margin-bottom: 14px;">
+          Nhập email và License Key (UUID) đã mua để sử dụng Trợ lý AI.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input
+            id="licEmail"
+            type="email"
+            class="form-input"
+            placeholder="you@example.com"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">License Key (UUID)</label>
+          <input
+            id="licKey"
+            type="text"
+            class="form-input"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+            required
+          />
+        </div>
+
+        <div id="licStatus" class="license-status"></div>
+
+        <p class="form-help" style="margin-top: 8px;">
+          Mất key? Liên hệ: <a href="mailto:support@2tocom.space">support@2tocom.space</a>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnActivate" class="btn primary" style="width: 100%;">
+          Kích hoạt
+        </button>
       </div>
     </div>
   </div>

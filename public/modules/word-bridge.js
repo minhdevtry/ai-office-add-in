@@ -16,33 +16,29 @@ export function escapeXml(text) {
 }
 
 export function buildPlainTextOoxml(text) {
-  const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
+  // Word.js `selection.insertOoxml(xml, location)` chỉ chấp nhận FRAGMENT,
+  // không phải full document package. Trả về chuỗi XML gồm 1+ paragraph
+  // với namespace w: ở root, Word sẽ merge vào selection.
+  const paragraphs = String(text || "").replace(/\r\n/g, "\n").split("\n");
   const bodyXml = paragraphs
     .map((p) => {
-      const runXml = p
-        ? `<w:r><w:rPr><w:b w:val="0"/><w:bCs w:val="0"/></w:rPr><w:t xml:space="preserve">${escapeXml(p)}</w:t></w:r>`
-        : "";
-      return `<w:p><w:pPr><w:pStyle w:val="Normal"/><w:jc w:val="left"/></w:pPr>${runXml}</w:p>`;
+      if (!p) {
+        return `<w:p><w:pPr><w:pStyle w:val="Normal"/></w:pPr></w:p>`;
+      }
+      return (
+        `<w:p><w:pPr><w:pStyle w:val="Normal"/><w:jc w:val="left"/></w:pPr>` +
+        `<w:r><w:rPr><w:b w:val="0"/><w:bCs w:val="0"/></w:rPr>` +
+        `<w:t xml:space="preserve">${escapeXml(p)}</w:t></w:r>` +
+        `</w:p>`
+      );
     })
     .join("");
 
-  return `<?xml version="1.0" standalone="yes"?>
-<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
-  <pkg:part pkg:name="/_rels/.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
-    <pkg:xmlData>
-      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-      </Relationships>
-    </pkg:xmlData>
-  </pkg:part>
-  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
-    <pkg:xmlData>
-      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-        <w:body>${bodyXml}</w:body>
-      </w:document>
-    </pkg:xmlData>
-  </pkg:part>
-</pkg:package>`;
+  return (
+    `<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+    bodyXml +
+    `</w:body>`
+  );
 }
 
 export function buildTrackedChangeOoxml(oldText, newText, author = "AI Assistant") {
@@ -266,9 +262,18 @@ export class WordBridge {
 
   /**
    * Chèn bình luận mép lề phải (Margin Comments via WordApi 1.4)
+   * Yêu cầu Word 2016+ / Microsoft 365. Không có fallback inline
+   * (vì sẽ làm thay đổi nội dung tài liệu gốc — trái với triết lý
+   * "không xáo trộn bài viết").
    */
   async insertComment(commentText, anchor = null) {
     if (!this.isAvailable()) throw new Error("Office.js không khả dụng");
+
+    if (!this.commentsSupported || typeof Word?.Comment === "undefined") {
+      throw new Error(
+        "Phiên bản Word hiện tại không hỗ trợ chèn bình luận (cần Word 2016 trở lên hoặc Microsoft 365)."
+      );
+    }
 
     return Word.run(async (context) => {
       let targetRange;
@@ -286,16 +291,9 @@ export class WordBridge {
         targetRange = context.document.getSelection();
       }
 
-      if (this.commentsSupported && typeof targetRange.insertComment === "function") {
-        targetRange.insertComment(commentText);
-        await context.sync();
-        return { ok: true, type: "margin_comment" };
-      } else {
-        // Fallback chèn ghi chú
-        targetRange.insertParagraph(`[AI Nhận xét: ${commentText}]`, Word.InsertLocation.after);
-        await context.sync();
-        return { ok: true, type: "inline_fallback" };
-      }
+      targetRange.insertComment(commentText);
+      await context.sync();
+      return { ok: true, type: "margin_comment" };
     });
   }
 
@@ -332,6 +330,46 @@ export class WordBridge {
       const sel = context.document.getSelection();
       sel.insertParagraph(text, Word.InsertLocation.after);
       await context.sync();
+    });
+  }
+
+  /**
+   * Tìm anchor trong tài liệu và chèn text (hoặc paragraph mới) ngay phía sau anchor.
+   * Gom tất cả vào 1 Word.run block để giữ state consistent.
+   *
+   * @param {string} anchor - Chuỗi cần tìm
+   * @param {string} text - Nội dung cần chèn
+   * @param {Object} options - { asParagraph: bool, style: string|null }
+   */
+  async insertAfterAnchor(anchor, text, { asParagraph = false, style = null } = {}) {
+    if (!this.isAvailable()) throw new Error("Office.js không khả dụng");
+    if (!anchor || !text) throw new Error("Thiếu anchor hoặc text");
+
+    return Word.run(async (context) => {
+      const results = context.document.body.search(anchor, { matchCase: false });
+      results.load("items");
+      await context.sync();
+
+      if (results.items.length === 0) {
+        throw new Error(`Không tìm thấy anchor: "${anchor}"`);
+      }
+
+      // Lấy paragraph cha của vị trí match (tránh lệch khi anchor nằm giữa paragraph)
+      const parentPara = results.items[0].paragraphs.getFirst();
+      parentPara.load("text");
+      await context.sync();
+
+      // Chèn ngay sau paragraph chứa anchor
+      const newPara = parentPara.insertParagraph(text, Word.InsertLocation.after);
+      await context.sync();
+
+      // Nếu yêu cầu paragraph mới riêng + style → style cho paragraph mới
+      if (asParagraph && style) {
+        newPara.style = style;
+        await context.sync();
+      }
+
+      return { ok: true, matchedAt: 0, totalMatches: results.items.length };
     });
   }
 
@@ -409,12 +447,13 @@ export class WordBridge {
 
   /**
    * Gán kiểu định dạng đoạn (Heading, Normal, v.v.)
+   * Sử dụng matchCase: false để consistent với selectRange, insertComment, insertAfterAnchor.
    */
   async setParagraphStyle(anchor, style) {
     if (!this.isAvailable()) return { ok: false };
 
     return Word.run(async (context) => {
-      const results = context.document.body.search(anchor, { matchCase: true });
+      const results = context.document.body.search(anchor, { matchCase: false });
       results.load("items");
       await context.sync();
       if (results.items.length === 0) throw new Error(`Không tìm thấy chuỗi neo: ${anchor}`);
@@ -428,12 +467,13 @@ export class WordBridge {
 
   /**
    * Chèn OOXML tùy biến
+   * Sử dụng matchCase: false để consistent với các search khác.
    */
   async insertOoxml(anchor, ooxml, location = "after") {
     if (!this.isAvailable()) return { ok: false };
 
     return Word.run(async (context) => {
-      const results = context.document.body.search(anchor, { matchCase: true });
+      const results = context.document.body.search(anchor, { matchCase: false });
       results.load("items");
       await context.sync();
       if (results.items.length === 0) throw new Error(`Không tìm thấy chuỗi neo: ${anchor}`);

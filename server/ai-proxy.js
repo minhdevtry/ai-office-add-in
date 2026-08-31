@@ -1,18 +1,42 @@
 /**
  * AI Proxy Adapter (Universal AI Gateway)
  * Tương thích 100% với cả chuẩn OpenAI-compatible và Anthropic-compatible
- * Hỗ trợ DeepSeek (V3/R1), OpenAI (GPT-4o), Claude (3.5/3.7), Gemini, Ollama, OpenRouter, OneAPI...
+ *
+ * SECURITY: AI endpoint, API key, model đều lấy từ server-side config.
+ * Client KHÔNG được override các giá trị này (tránh leak key qua .docx file).
  */
 
+import { config, normalizeEffort, VALID_EFFORTS } from "./config.js";
+
+// ─── Effort Mapping (5 mức → provider-specific param) ──────────────────────
+
+/**
+ * Map effort level → Anthropic thinking.budget_tokens
+ * Anthropic yêu cầu: max_tokens > budget_tokens
+ */
+const EFFORT_BUDGET_TOKENS = {
+  low: 1024,
+  medium: 4096,
+  high: 16384,
+  xhigh: 32768,
+};
+
+/**
+ * Effort levels supported by OpenAI reasoning models
+ * (chỉ các model o-series, gpt-5.x mới có param này)
+ */
+const VALID_OPENAI_EFFORTS = new Set(["low", "medium", "high", "xhigh"]);
+
 export class AiProxy {
-  constructor(defaultEndpoint, defaultApiKey, defaultModel) {
-    this.defaultEndpoint = defaultEndpoint || process.env.AI_API_ENDPOINT || "https://api.deepseek.com/chat/completions";
-    this.defaultApiKey = defaultApiKey || process.env.AI_API_KEY || "";
-    this.defaultModel = defaultModel || process.env.AI_MODEL || "deepseek-chat";
+  constructor() {
+    this.defaultEndpoint = config.ai.endpoint;
+    this.defaultApiKey = config.ai.apiKey;
+    this.defaultModel = config.ai.model;
+    this.defaultEffort = config.ai.defaultEffort;
   }
 
   /**
-   * Xác định endpoint là dạng Anthropic hay OpenAI
+   * Xác định endpoint là dạng Anthropic hay OpenAI-compatible
    */
   isAnthropicEndpoint(endpoint = "") {
     const ep = endpoint.toLowerCase();
@@ -23,13 +47,12 @@ export class AiProxy {
    * Chuẩn bị Headers cho request
    */
   buildHeaders(endpoint, apiKey) {
-    const key = apiKey || this.defaultApiKey;
     const isAnthropic = this.isAnthropicEndpoint(endpoint);
 
     if (isAnthropic) {
       return {
         "content-type": "application/json",
-        "x-api-key": key,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
       };
@@ -37,16 +60,18 @@ export class AiProxy {
 
     return {
       "content-type": "application/json",
-      "authorization": `Bearer ${key}`,
+      authorization: `Bearer ${apiKey}`,
     };
   }
 
   /**
-   * Chuẩn bị Payload cho request
+   * Chuẩn bị Payload cho request — thêm param `effort` để map sang
+   * Anthropic `thinking.budget_tokens` hoặc OpenAI `reasoning_effort`.
    */
-  buildPayload(endpoint, { messages, systemPrompt, model, stream = true, maxTokens = 4096, temperature = 0.7 }) {
+  buildPayload(endpoint, { messages, systemPrompt, model, stream = true, maxTokens = 4096, temperature = 0.7, effort = null }) {
     const isAnthropic = this.isAnthropicEndpoint(endpoint);
     const selectedModel = model || this.defaultModel;
+    const safeEffort = VALID_EFFORTS.includes(effort) ? effort : this.defaultEffort;
 
     if (isAnthropic) {
       const payload = {
@@ -64,10 +89,20 @@ export class AiProxy {
       if (systemPrompt) {
         payload.system = systemPrompt;
       }
+
+      // Map effort → Anthropic thinking
+      if (safeEffort !== "off") {
+        const budgetTokens = EFFORT_BUDGET_TOKENS[safeEffort] || EFFORT_BUDGET_TOKENS.medium;
+        payload.thinking = { type: "enabled", budget_tokens: budgetTokens };
+        // Anthropic yêu cầu: max_tokens > budget_tokens
+        if (payload.max_tokens <= budgetTokens) {
+          payload.max_tokens = budgetTokens + 1024;
+        }
+      }
       return payload;
     }
 
-    // OpenAI-compatible payload (DeepSeek, OpenAI, Gemini, Ollama, OpenRouter...)
+    // OpenAI-compatible payload (DeepSeek, OpenAI, Gemini, Ollama, OpenRouter, MiniMax...)
     const fullMessages = [];
     if (systemPrompt) {
       fullMessages.push({ role: "system", content: systemPrompt });
@@ -81,24 +116,47 @@ export class AiProxy {
       }
     }
 
-    return {
+    const payload = {
       model: selectedModel,
       messages: fullMessages,
       max_tokens: maxTokens,
       stream: !!stream,
       temperature,
     };
+
+    // Map effort → OpenAI reasoning_effort
+    // Chỉ gửi khi effort hợp lệ với OpenAI spec và khác "off"
+    if (safeEffort !== "off" && VALID_OPENAI_EFFORTS.has(safeEffort)) {
+      payload.reasoning_effort = safeEffort;
+    }
+
+    return payload;
   }
 
   /**
-   * Xử lý request (tự động phân nhánh Stream SSE hoặc JSON phản hồi trực tiếp)
+   * Xử lý request — lấy endpoint/apiKey/model từ SERVER CONFIG (KHÔNG từ client)
    */
   async handleRequest(reqBody, res) {
-    const endpoint = reqBody.endpoint || this.defaultEndpoint;
-    const apiKey = reqBody.apiKey || this.defaultApiKey;
+    // SECURITY: Luôn lấy từ server config, bỏ qua mọi giá trị client gửi lên
+    const endpoint = this.defaultEndpoint;
+    const apiKey = this.defaultApiKey;
+    const model = this.defaultModel;
+
     const stream = reqBody.stream !== false;
+    const effort = reqBody.effort || this.defaultEffort;
+    const maxTokens = reqBody.maxTokens || config.ai.maxTokens;
+    const temperature = reqBody.temperature ?? config.ai.temperature;
+
     const headers = this.buildHeaders(endpoint, apiKey);
-    const payload = this.buildPayload(endpoint, reqBody);
+    const payload = this.buildPayload(endpoint, {
+      messages: reqBody.messages || [],
+      systemPrompt: reqBody.systemPrompt,
+      model,
+      stream,
+      maxTokens,
+      temperature,
+      effort,
+    });
 
     let upstreamResponse;
     try {
@@ -115,14 +173,57 @@ export class AiProxy {
     }
 
     if (!upstreamResponse.ok) {
-      let errorBody = "";
-      try {
-        errorBody = await upstreamResponse.text();
-      } catch (_) {}
-      res.status(upstreamResponse.status).json({
-        error: `Lỗi từ AI Endpoint (${upstreamResponse.status}): ${errorBody}`,
-      });
-      return;
+      // Nếu OpenAI-compatible provider reject vì `xhigh` không support
+      // → retry 1 lần với effort thấp hơn
+      if (
+        effort === "xhigh" &&
+        !this.isAnthropicEndpoint(endpoint) &&
+        upstreamResponse.status >= 400 &&
+        upstreamResponse.status < 500
+      ) {
+        const retryPayload = this.buildPayload(endpoint, {
+          messages: reqBody.messages || [],
+          systemPrompt: reqBody.systemPrompt,
+          model,
+          stream,
+          maxTokens,
+          temperature,
+          effort: "high", // fallback từ xhigh → high
+        });
+        try {
+          upstreamResponse = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(retryPayload),
+          });
+          if (!upstreamResponse.ok) {
+            const errBody = await upstreamResponse.text().catch(() => "");
+            res.status(upstreamResponse.status).json({
+              error: `Lỗi từ AI Endpoint (${upstreamResponse.status}): ${errBody}`,
+              note: "Đã retry với effort=high nhưng vẫn fail.",
+            });
+            return;
+          }
+          // Ghi log warning
+          console.warn(
+            `[AI-PROXY] ⚠️  Provider reject xhigh, đã retry với high. Endpoint: ${endpoint}`
+          );
+        } catch (e) {
+          res.status(502).json({
+            error: `Lỗi retry sau khi provider reject xhigh: ${e.message}`,
+          });
+          return;
+        }
+      } else {
+        let errorBody = "";
+        try {
+          errorBody = await upstreamResponse.text();
+        } catch (_) {}
+        res.status(upstreamResponse.status).json({
+          error: `Lỗi từ AI Endpoint (${upstreamResponse.status}): ${errorBody}`,
+        });
+        return;
+      }
     }
 
     // Nếu không stream (ví dụ: test connection)
@@ -187,7 +288,7 @@ export class AiProxy {
                 }
               }
             } else {
-              // Sự kiện từ OpenAI / DeepSeek
+              // Sự kiện từ OpenAI / DeepSeek / MiniMax
               const choice = parsed.choices?.[0];
               if (choice?.delta) {
                 // Hỗ trợ thinking từ DeepSeek R1 (reasoning_content)
@@ -233,3 +334,6 @@ export class AiProxy {
 }
 
 export const aiProxy = new AiProxy();
+
+// Re-export để test/export từ module khác
+export { EFFORT_BUDGET_TOKENS, VALID_OPENAI_EFFORTS };

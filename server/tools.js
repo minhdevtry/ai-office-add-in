@@ -75,6 +75,12 @@ class WordClientManager {
     };
 
     return new Promise((resolve, reject) => {
+      // Validate ws state TRƯỚC khi register pending (tránh leak pending nếu ws đã đóng)
+      if (client.ws.readyState !== 1) {
+        return reject(new Error("WebSocket client không sẵn sàng (đã đóng hoặc đang kết nối)."));
+      }
+
+      // Tạo timeout
       const timeout = setTimeout(() => {
         if (this.pendingOps.has(id)) {
           this.pendingOps.delete(id);
@@ -82,13 +88,28 @@ class WordClientManager {
         }
       }, timeoutMs);
 
+      // Set pending TRƯỚC khi send để đảm bảo handleResult tìm thấy
       this.pendingOps.set(id, { resolve, reject, timeout });
 
+      // Gửi op
       try {
-        client.ws.send(JSON.stringify(payload));
+        client.ws.send(JSON.stringify(payload), (err) => {
+          // Nếu send fail (vd: ws đã đóng giữa lúc check và send),
+          // cleanup pending để tránh leak.
+          if (err) {
+            if (this.pendingOps.has(id)) {
+              this.pendingOps.delete(id);
+              clearTimeout(timeout);
+              reject(err);
+            }
+          }
+        });
       } catch (err) {
-        clearTimeout(timeout);
-        this.pendingOps.delete(id);
+        // Send throw đồng bộ (hiếm gặp nhưng cần handle)
+        if (this.pendingOps.has(id)) {
+          this.pendingOps.delete(id);
+          clearTimeout(timeout);
+        }
         reject(err);
       }
     });

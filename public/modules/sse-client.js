@@ -3,6 +3,8 @@
  * Tiếp nhận luồng Server-Sent Events từ Backend, tách nhỏ token-by-token và bóc tách Thinking mode
  */
 
+import { docState } from "./doc-state.js";
+
 export class SseStreamClient {
   constructor(endpointUrl = "/api/chat") {
     this.endpointUrl = endpointUrl;
@@ -10,15 +12,27 @@ export class SseStreamClient {
   }
 
   /**
+   * Lấy license headers từ localStorage (per-user)
+   */
+  getLicenseHeaders() {
+    const lic = docState.loadLicense();
+    if (!lic?.licenseKey || !lic?.deviceId) return {};
+    return {
+      "X-License-Key": lic.licenseKey,
+      "X-Client-Id": lic.deviceId,
+    };
+  }
+
+  /**
    * Bắt đầu gửi yêu cầu và đọc luồng stream
+   *
+   * SECURITY: KHÔNG gửi endpoint/apiKey/model từ client nữa.
+   * Server lấy từ config. Chỉ gửi messages, systemPrompt, effort.
    */
   async streamChat({
     messages,
     systemPrompt,
-    endpoint,
-    apiKey,
-    model,
-    enableThinking = true,
+    effort = "medium",
     onDelta,
     onThinking,
     onDone,
@@ -36,15 +50,13 @@ export class SseStreamClient {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...this.getLicenseHeaders(),
         },
         body: JSON.stringify({
           messages,
           systemPrompt,
-          endpoint,
-          apiKey,
-          model,
+          effort,
           stream: true,
-          enableThinking,
         }),
         signal: this.abortController.signal,
       });

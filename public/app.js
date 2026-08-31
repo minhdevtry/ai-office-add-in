@@ -8,6 +8,8 @@ import { wordBridge } from "./modules/word-bridge.js";
 import { docState } from "./modules/doc-state.js";
 import { sseClient } from "./modules/sse-client.js";
 import { wsClient } from "./modules/ws-client.js";
+import { licenseClient } from "./modules/license-client.js";
+import { getOrCreateDeviceId } from "./modules/device-fingerprint.js";
 
 class AppController {
   constructor() {
@@ -18,10 +20,7 @@ class AppController {
       skills: [],
       theme: "light",
       config: {
-        endpoint: "",
-        apiKey: "",
-        model: "",
-        enableThinking: true,
+        effort: "medium", // off | low | medium | high | xhigh
         houseVoice: "",
       },
     };
@@ -35,9 +34,18 @@ class AppController {
     this.bindEvents();
     await this.loadSkills();
     this.initOffice();
+
+    // License gate: phải kích hoạt trước khi dùng app
+    const activated = await this.initLicense();
+    if (!activated) {
+      // Show modal block, không init phần còn lại
+      return;
+    }
+
     this.initWebSocket();
     this.loadState();
     this.renderSkills();
+    this.initEffortDropdown();
   }
 
   cacheDom() {
@@ -46,6 +54,7 @@ class AppController {
       statusText: document.getElementById("statusText"),
       btnToggleTheme: document.getElementById("btnToggleTheme"),
       btnSettings: document.getElementById("btnSettings"),
+      effortSelect: document.getElementById("effortSelect"),
       skillsBar: document.getElementById("skillsBar"),
       contextBar: document.getElementById("contextBar"),
       contextTypeIcon: document.getElementById("contextTypeIcon"),
@@ -64,11 +73,15 @@ class AppController {
       settingsModal: document.getElementById("settingsModal"),
       btnCloseSettings: document.getElementById("btnCloseSettings"),
       btnSaveSettings: document.getElementById("btnSaveSettings"),
-      btnTestConn: document.getElementById("btnTestConn"),
-      cfgEndpoint: document.getElementById("cfgEndpoint"),
-      cfgApiKey: document.getElementById("cfgApiKey"),
-      cfgModel: document.getElementById("cfgModel"),
       cfgHouseVoice: document.getElementById("cfgHouseVoice"),
+      licEmailDisplay: document.getElementById("licEmailDisplay"),
+      licDeviceDisplay: document.getElementById("licDeviceDisplay"),
+      // License Modal
+      licenseModal: document.getElementById("licenseModal"),
+      licEmail: document.getElementById("licEmail"),
+      licKey: document.getElementById("licKey"),
+      licStatus: document.getElementById("licStatus"),
+      btnActivate: document.getElementById("btnActivate"),
     };
   }
 
@@ -131,9 +144,37 @@ class AppController {
     this.dom.btnSettings.addEventListener("click", () => this.openSettings());
     this.dom.btnCloseSettings.addEventListener("click", () => this.closeSettings());
     this.dom.btnSaveSettings.addEventListener("click", () => this.saveSettings());
-    this.dom.btnTestConn.addEventListener("click", () => this.testAiConnection());
     this.dom.settingsModal.addEventListener("click", (e) => {
       if (e.target === this.dom.settingsModal) this.closeSettings();
+    });
+
+    // License Modal
+    if (this.dom.btnActivate) {
+      this.dom.btnActivate.addEventListener("click", () => this.handleActivate());
+    }
+    if (this.dom.licKey) {
+      this.dom.licKey.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") this.handleActivate();
+      });
+    }
+    if (this.dom.licEmail) {
+      this.dom.licEmail.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") this.dom.licKey?.focus();
+      });
+    }
+  }
+
+  /**
+   * Khởi tạo dropdown Effort — bind sự kiện change
+   * Lưu vào localStorage (KHÔNG lưu vào document.settings)
+   */
+  initEffortDropdown() {
+    if (!this.dom.effortSelect) return;
+    this.dom.effortSelect.value = this.state.config.effort;
+    this.dom.effortSelect.addEventListener("change", () => {
+      const effort = this.dom.effortSelect.value;
+      this.state.config.effort = effort;
+      docState.saveEffort(effort);
     });
   }
 
@@ -200,11 +241,117 @@ class AppController {
     this.dom.statusText.textContent = text;
   }
 
+  // ─── LICENSE LIFECYCLE ────────────────────────────────────────────────
+
+  /**
+   * Kiểm tra license local; nếu chưa có thì show modal và đợi user activate.
+   * Trả về true nếu đã activated (sẵn sàng dùng app).
+   */
+  async initLicense() {
+    // Đảm bảo deviceId đã được tạo (UUID v4)
+    getOrCreateDeviceId();
+
+    // Fetch public config để lấy default effort từ server
+    const publicConfig = await licenseClient.fetchPublicConfig();
+    if (publicConfig?.aiDefaultEffort) {
+      // Chỉ set nếu user chưa có lựa chọn
+      const saved = docState.loadEffort(null);
+      if (!saved) {
+        this.state.config.effort = publicConfig.aiDefaultEffort;
+        docState.saveEffort(publicConfig.aiDefaultEffort);
+      }
+    }
+
+    // Check local license
+    if (licenseClient.isActivated()) {
+      // Bắt đầu heartbeat
+      licenseClient.startHeartbeat();
+      licenseClient.onInvalidate(() => this.showLicenseModal(true));
+      return true;
+    }
+
+    // Chưa có → show modal
+    this.showLicenseModal(false);
+    return false;
+  }
+
+  showLicenseModal(showStatus) {
+    if (!this.dom.licenseModal) return;
+    this.dom.licenseModal.classList.add("open");
+    this.dom.licenseModal.style.display = "flex";
+    if (showStatus && this.dom.licStatus) {
+      this.showLicenseStatus("error", "Phiên bản quyền đã hết hạn. Vui lòng kích hoạt lại.");
+    }
+  }
+
+  hideLicenseModal() {
+    if (!this.dom.licenseModal) return;
+    this.dom.licenseModal.classList.remove("open");
+    this.dom.licenseModal.style.display = "none";
+  }
+
+  showLicenseStatus(type, msg) {
+    if (!this.dom.licStatus) return;
+    this.dom.licStatus.className = `license-status show ${type}`;
+    this.dom.licStatus.textContent = msg;
+  }
+
+  clearLicenseStatus() {
+    if (!this.dom.licStatus) return;
+    this.dom.licStatus.className = "license-status";
+    this.dom.licStatus.textContent = "";
+  }
+
+  async handleActivate() {
+    const email = this.dom.licEmail.value.trim();
+    const licenseKey = this.dom.licKey.value.trim();
+
+    // Validate format
+    if (!email || !licenseKey) {
+      this.showLicenseStatus("error", "Vui lòng nhập đầy đủ email và License Key.");
+      return;
+    }
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!uuidRegex.test(licenseKey)) {
+      this.showLicenseStatus("error", "License Key phải là UUID (8-4-4-4-12 hex chars).");
+      return;
+    }
+
+    this.dom.btnActivate.disabled = true;
+    this.dom.btnActivate.textContent = "Đang kích hoạt...";
+    this.clearLicenseStatus();
+
+    try {
+      const deviceName = navigator.userAgent.includes("Word") ? "Word Desktop" : "Web";
+      const result = await licenseClient.activate({ email, licenseKey, deviceName });
+
+      this.showLicenseStatus("success", `✅ Kích hoạt thành công! ${result.isNewDevice ? "Đã đăng ký thiết bị mới." : "Thiết bị đã được đăng ký trước đó."}`);
+
+      // Bắt đầu heartbeat
+      licenseClient.startHeartbeat();
+      licenseClient.onInvalidate(() => this.showLicenseModal(true));
+
+      // Reload app: ẩn modal, init các phần còn lại
+      setTimeout(() => {
+        this.hideLicenseModal();
+        this.initWebSocket();
+        this.loadState();
+        this.renderSkills();
+        this.initEffortDropdown();
+        this.showToast("✅ Kích hoạt bản quyền thành công!");
+      }, 800);
+    } catch (err) {
+      this.showLicenseStatus("error", err.message || "Kích hoạt thất bại. Vui lòng thử lại.");
+    } finally {
+      this.dom.btnActivate.disabled = false;
+      this.dom.btnActivate.textContent = "Kích hoạt";
+    }
+  }
+
   loadState() {
     this.state.messages = docState.loadHistory();
     this.state.config.houseVoice = docState.loadHouseVoice();
-    const cfg = docState.loadConfig();
-    this.state.config = { ...this.state.config, ...cfg };
+    this.state.config.effort = docState.loadEffort(this.state.config.effort);
 
     if (this.state.messages.length > 0) {
       this.dom.emptyHint.style.display = "none";
@@ -325,10 +472,7 @@ class AppController {
       await sseClient.streamChat({
         messages: this.state.messages,
         systemPrompt,
-        endpoint: this.state.config.endpoint,
-        apiKey: this.state.config.apiKey,
-        model: this.state.config.model,
-        enableThinking: this.state.config.enableThinking !== false,
+        effort: this.state.config.effort,
 
         onThinking: (chunk, fullThinking) => {
           assistantBubble.updateThinking(fullThinking);
@@ -459,8 +603,11 @@ class AppController {
     const actionsBar = document.createElement("div");
     actionsBar.className = "msg-actions";
 
+    // Nếu skill có defaultMode, dùng nó làm primary; mặc định là "replace"
+    const defaultMode = meta?.defaultMode || "replace";
+
     const actions = [
-      { id: "replace", label: "🔄 Thay thế", primary: true, fn: () => wordBridge.replaceSelection(text) },
+      { id: "replace", label: "🔄 Thay thế", fn: () => wordBridge.replaceSelection(text) },
       { id: "cursor", label: "➕ Tại con trỏ", fn: () => wordBridge.insertAtCursor(text) },
       { id: "after", label: "⬇️ Sau đoạn", fn: () => wordBridge.insertParagraphAfter(text) },
       { id: "end", label: "📄 Cuối trang", fn: () => wordBridge.appendDocumentEnd(text) },
@@ -477,7 +624,8 @@ class AppController {
 
     for (const act of actions) {
       const btn = document.createElement("button");
-      btn.className = `action-btn ${act.primary ? "primary" : ""}`;
+      const isPrimary = act.id === defaultMode;
+      btn.className = `action-btn ${isPrimary ? "primary" : ""}`;
       btn.textContent = act.label;
       btn.addEventListener("click", async () => {
         try {
@@ -527,10 +675,19 @@ class AppController {
   // ─── SETTINGS MODAL & TEST CONNECTION ───
 
   openSettings() {
-    this.dom.cfgEndpoint.value = this.state.config.endpoint || "";
-    this.dom.cfgApiKey.value = this.state.config.apiKey || "";
-    this.dom.cfgModel.value = this.state.config.model || "";
     this.dom.cfgHouseVoice.value = this.state.config.houseVoice || "";
+
+    // Hiển thị thông tin license (sẽ được update khi license client ready)
+    const lic = docState.loadLicense();
+    if (this.dom.licEmailDisplay) {
+      this.dom.licEmailDisplay.textContent = lic?.email || "—";
+    }
+    if (this.dom.licDeviceDisplay) {
+      this.dom.licDeviceDisplay.textContent = lic?.deviceId
+        ? `${lic.deviceId.substring(0, 12)}...`
+        : "—";
+    }
+
     this.dom.settingsModal.classList.add("open");
   }
 
@@ -539,52 +696,11 @@ class AppController {
   }
 
   saveSettings() {
-    this.state.config.endpoint = this.dom.cfgEndpoint.value.trim();
-    this.state.config.apiKey = this.dom.cfgApiKey.value.trim();
-    this.state.config.model = this.dom.cfgModel.value.trim();
     this.state.config.houseVoice = this.dom.cfgHouseVoice.value.trim();
-
-    docState.saveConfig(this.state.config);
     docState.saveHouseVoice(this.state.config.houseVoice);
 
     this.closeSettings();
     this.showToast("✅ Đã lưu cài đặt thành công!");
-  }
-
-  async testAiConnection() {
-    this.dom.btnTestConn.textContent = "Đang kiểm tra...";
-    this.dom.btnTestConn.disabled = true;
-
-    const endpoint = this.dom.cfgEndpoint.value.trim();
-    const apiKey = this.dom.cfgApiKey.value.trim();
-    const model = this.dom.cfgModel.value.trim();
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: "Chào bạn, hãy trả lời 'OK'." }],
-          endpoint,
-          apiKey,
-          model,
-          stream: false,
-          maxTokens: 10,
-        }),
-      });
-
-      if (res.ok) {
-        this.showToast("✨ Kết nối AI Endpoint thành công!");
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        this.showToast(`⚠️ Lỗi kết nối: ${errJson.error || res.statusText}`);
-      }
-    } catch (err) {
-      this.showToast(`⚠️ Không thể kết nối: ${err.message}`);
-    } finally {
-      this.dom.btnTestConn.textContent = "Kiểm tra kết nối";
-      this.dom.btnTestConn.disabled = false;
-    }
   }
 
   clearChatHistory() {
@@ -602,29 +718,46 @@ class AppController {
 
   formatMarkdown(text) {
     if (!text) return "";
-    let html = this.escapeHtml(text);
+    // Tokenize: escape toàn bộ text trước, sau đó thay thế các pattern
+    // bằng placeholder đặc biệt để tránh escape 2 lần.
+    const escaped = this.escapeHtml(text);
+
+    // Dùng 1 pass duy nhất qua escaped text. Block-level (h1, pre) cần
+    // bảo toàn nội dung bên trong, nên chỉ áp dụng <br/> bên ngoài block.
+    let html = escaped;
+
+    // Code blocks (must come FIRST để bảo vệ nội dung bên trong)
+    html = html.replace(/```([a-z]*)\n([\s\S]*?)```/gim, (m, lang, body) => {
+      return `<pre><code>${body}</code></pre>`;
+    });
 
     // Headers
     html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
     html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
     html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
 
-    // Code blocks
-    html = html.replace(/```([a-z]*)\n([\s\S]*?)```/gim, "<pre><code>$2</code></pre>");
     // Inline code
     html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
 
-    // Bold, Italic
+    // Bold, Italic (bold trước vì ** chứa *)
     html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
-    // Lists
-    html = html.replace(/^\s*[-*]\s+(.*$)/gim, "<li>$1</li>");
-    html = html.replace(/(<li>.*<\/li>)/gim, "<ul>$1</ul>");
+    // Lists: gom các dòng liên tiếp bắt đầu bằng `-` hoặc `*` thành <ul>
+    html = html.replace(/(^|\n)((?:[-*]\s+[^\n]+\n?)+)/g, (match, prefix, block) => {
+      const items = block.trim().split(/\n/).map((l) => `<li>${l.replace(/^[-*]\s+/, "")}</li>`).join("");
+      return `${prefix}<ul>${items}</ul>`;
+    });
 
-    // Paragraphs / line breaks
-    html = html.replace(/\n\n/g, "<br/><br/>");
-    html = html.replace(/\n/g, "<br/>");
+    // Line breaks: chỉ thay \n còn lại (không nằm trong <pre>...</pre>)
+    // Tách ra theo dòng rồi nối lại, bỏ qua nội dung trong <pre>
+    const parts = html.split(/(<pre>[\s\S]*?<\/pre>)/g);
+    html = parts
+      .map((part) => {
+        if (part.startsWith("<pre>")) return part;
+        return part.replace(/\n/g, "<br/>");
+      })
+      .join("");
 
     return html;
   }

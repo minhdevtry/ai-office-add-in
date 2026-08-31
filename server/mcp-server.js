@@ -41,6 +41,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const tool = tools.find((t) => t.name === name);
 
   if (!tool) {
+    console.error(`[MCP] Tool not found: ${name}`);
     return {
       isError: true,
       content: [
@@ -59,8 +60,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     ...args,
   };
 
+  const startTime = Date.now();
+  console.error(`[MCP] → ${name} (kind=${kind}, args=${JSON.stringify(args).slice(0, 200)})`);
+
   try {
     const result = await clientManager.dispatchOp(op);
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 3000) {
+      console.error(`[MCP] ← ${name} OK (${elapsed}ms, SLOW)`);
+    } else {
+      console.error(`[MCP] ← ${name} OK (${elapsed}ms)`);
+    }
     return {
       content: [
         {
@@ -70,6 +80,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
     };
   } catch (err) {
+    const elapsed = Date.now() - startTime;
+    console.error(`[MCP] ✗ ${name} FAILED (${elapsed}ms): ${err.message}`);
     return {
       isError: true,
       content: [
