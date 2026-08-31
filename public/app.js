@@ -17,6 +17,28 @@ if (typeof window !== "undefined") {
   } catch (_) {}
 }
 
+// Filter browser warning spam: "Tracking Prevention blocked access to storage"
+// từ third-party scripts (Office SDK, jsdelivr CDN) — browser tự log khi script
+// third-party cố access localStorage. Không thể sửa source của họ, nên filter ở console.
+if (typeof window !== "undefined" && typeof window.console !== "undefined") {
+  const _origWarn = window.console.warn.bind(window.console);
+  const _origError = window.console.error.bind(window.console);
+  const _filter = (args) => {
+    const s = args.map((a) => (typeof a === "string" ? a : "")).join(" ");
+    if (/Tracking Prevention blocked access to storage/i.test(s)) return; // bỏ qua
+    if (/Tracking Prevention blocked storage/i.test(s)) return;
+    return false; // không filter
+  };
+  window.console.warn = (...args) => {
+    if (_filter(args) === undefined) return;
+    _origWarn(...args);
+  };
+  window.console.error = (...args) => {
+    if (_filter(args) === undefined) return;
+    _origError(...args);
+  };
+}
+
 // ─── Detect localStorage bị Tracking Prevention chặn (Office iframe) ───
 // Browser vẫn log warning mỗi lần gọi localStorage trong third-party context,
 // kể cả khi wrap trong try/catch. Detect 1 lần lúc init, set flag global
